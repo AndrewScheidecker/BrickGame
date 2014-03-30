@@ -1,0 +1,21 @@
+{
+    "PluginFileVersion" : 1,
+	
+	"FriendlyName" : "BrickGrid Plugin",
+	"Version" : 1,
+	"VersionName" : "1.0",
+	"CreatedBy" : "Andrew Scheidecker",
+	"CreatedByURL" : "http://www.scheidecker.net",
+	"MinEngineVersion" : 1579795,
+	"Description" : "A component that renders a 3D grid of cubes.",
+	"CategoryPath" : "Rendering.Components",
+	
+    "Modules" :
+	[
+		{
+			"Name" : "BrickGrid",
+			"Type" : "Runtime",
+			"BlacklistPlatforms" : [ "HTML5" ]
+		}
+	]
+}
