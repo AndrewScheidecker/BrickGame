@@ -4,6 +4,7 @@
 *.opensdf
 *.sdf
 *.xcodeproj
+*.sublime-*
 
 /Saved/**
 /Intermediate/**
