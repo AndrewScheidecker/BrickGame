@@ -1,0 +1,20 @@
+{
+    "FileVersion" : 3,
+	
+	"FriendlyName" : "SimplexNoise",
+	"Version" : 1,
+	"VersionName" : "1.0",
+	"CreatedBy" : "Andrew Scheidecker",
+	"CreatedByURL" : "http://www.scheidecker.net/",
+	"EngineVersion" : 1579795,
+	"Description" : "A plugin that provides a simplex noise function that is callable from Blueprint.",
+	"Category" : "Blueprint",
+	
+    "Modules" :
+	[
+		{
+			"Name" : "SimplexNoise",
+			"Type" : "Runtime"
+		}
+	]
+}
