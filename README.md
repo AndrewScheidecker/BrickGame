@@ -10,6 +10,8 @@ All of the procedural terrain generation happens in BluePrint, but it uses a sim
 
 The BrickGrid, SuperLoop, and SimplexNoise plugins don't have any dependencies apart from built-in UE4 modules, so it should be easy to drop them into your own game individually or as a group.
 
+![ScreenShot](https://raw.githubusercontent.com/AndrewScheidecker/BrickGame/trunk/Screenshot.jpg)
+
 # License
 
 Copyright (c) 2014, Andrew Scheidecker
