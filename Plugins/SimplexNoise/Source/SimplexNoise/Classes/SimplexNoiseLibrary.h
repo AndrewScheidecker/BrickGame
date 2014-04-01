@@ -13,12 +13,15 @@ class USimplexNoiseLibrary : public UBlueprintFunctionLibrary
 
 public:
 
+	// Samples a 1D simplex noise function, returning a value between 0-1.
 	UFUNCTION(BlueprintCallable,Category=Noise)
 	static float Sample(float X);
 
+	// Samples a 2D simplex noise function, returning a value between 0-1.
 	UFUNCTION(BlueprintCallable,Category=Noise)
 	static float Sample2D(float X,float Y);
 
+	// Samples a 3D simplex noise function, returning a value between 0-1.
 	UFUNCTION(BlueprintCallable,Category=Noise)
 	static float Sample3D(float X,float Y,float Z);
 };

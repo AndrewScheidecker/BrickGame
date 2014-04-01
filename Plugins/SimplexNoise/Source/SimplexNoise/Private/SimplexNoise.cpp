@@ -5,8 +5,9 @@
 #include "SimplexNoise.generated.inl"
 #include "PublicDomainSimplexNoise.inl"
 
-FPublicDomainSimplexNoiseImplementation Implementation;
+static FPublicDomainSimplexNoiseImplementation Implementation;
 
+// Dynamically-loaded module interface
 class FSimplexNoise : public ISimplexNoise
 {
 	virtual float Sample(float X) OVERRIDE
@@ -24,8 +25,8 @@ class FSimplexNoise : public ISimplexNoise
 };
 IMPLEMENT_MODULE( FSimplexNoise, SimplexNoise )
 
+// BluePrint-accessible interface
 USimplexNoiseLibrary::USimplexNoiseLibrary(const class FPostConstructInitializeProperties& PCIP) : Super(PCIP) {}
-
 float USimplexNoiseLibrary::Sample(float X)
 {
 	return Implementation.Generate(X) * 0.5f + 0.5f;
@@ -39,6 +40,7 @@ float USimplexNoiseLibrary::Sample3D(float X,float Y,float Z)
 	return Implementation.Generate(X,Y,Z) * 0.5f + 0.5f;
 }
 
+// Statically-loaded module interface
 namespace SimplexNoise
 {
 	float Sample(float X)
