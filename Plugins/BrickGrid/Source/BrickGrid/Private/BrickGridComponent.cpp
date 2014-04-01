@@ -440,11 +440,16 @@ UBrickGridComponent::UBrickGridComponent( const FPostConstructInitializeProperti
 {
 	PrimaryComponentTick.bCanEverTick = false;
 
+	CollisionBodySetup = ConstructObject<UBodySetup>(UBodySetup::StaticClass(), this);
+	CollisionBodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
 	SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
 }
 
 FPrimitiveSceneProxy* UBrickGridComponent::CreateSceneProxy()
 {
+	// Update the collision body if the rendering proxy has been recreated for any reason, since the causes mostly also invalidate the collision body.
+	UpdateCollisionBody();
+
 	return new FBrickGridSceneProxy(this);
 }
 
@@ -454,4 +459,62 @@ FBoxSphereBounds UBrickGridComponent::CalcBounds(const FTransform & LocalToWorld
 	NewBounds.Origin = NewBounds.BoxExtent = FVector(GetSizeX(),GetSizeY(),GetSizeZ()) / 2.0f;
 	NewBounds.SphereRadius = NewBounds.BoxExtent.Size();
 	return NewBounds.TransformBy(LocalToWorld);
+}
+
+class UBodySetup* UBrickGridComponent::GetBodySetup()
+{
+	if (!CollisionBodySetup)
+	{
+		UpdateCollisionBody();
+	}
+	return CollisionBodySetup;
+}
+
+void UBrickGridComponent::UpdateCollisionBody()
+{
+	CollisionBodySetup->AggGeom.BoxElems.Reset();
+
+	// Iterate over each brick in the chunk.
+	for (uint32 Z = 0; Z < SizeZ; ++Z)
+	{
+		for (uint32 Y = 0; Y < SizeY; ++Y)
+		{
+			for (uint32 X = 0; X < SizeX; ++X)
+			{
+				// Only create collision boxes for bricks that aren't empty.
+				const uint32 BrickMaterial = Get(X,Y,Z);
+				if (BrickMaterial != GetEmptyMaterialIndex())
+				{
+					// Only create collision boxes for bricks that are adjacent to an empty brick.
+					bool HasEmptyNeighbor = false;
+					for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
+					{
+						if(Get(FIntVector(X,Y,Z) + FaceNormal[FaceIndex]) == GetEmptyMaterialIndex())
+						{
+							HasEmptyNeighbor = true;
+							break;
+						}
+					}
+					if(HasEmptyNeighbor)
+					{
+						FKBoxElem& BoxElement = *new(CollisionBodySetup->AggGeom.BoxElems) FKBoxElem;
+
+						// Physics bodies are uniformly scaled by the minimum component of the 3D scale.
+						// Compute the non-uniform scaling components to apply to the box center/extent.
+						const FVector AbsScale3D = ComponentToWorld.GetScale3D().GetAbs();
+						const FVector NonUniformScale3D = AbsScale3D / AbsScale3D.GetMin();
+
+						// Set the box center and extent.
+						BoxElement.Center = FVector((X + 0.5f) * NonUniformScale3D.X, (Y + 0.5f) * NonUniformScale3D.Y, (Z + 0.5f) * NonUniformScale3D.Z);
+						BoxElement.X = 0.5f * NonUniformScale3D.X;
+						BoxElement.Y = 0.5f * NonUniformScale3D.Y;
+						BoxElement.Z = 0.5f * NonUniformScale3D.Z;
+					}
+				}
+			}
+		}
+	}
+
+	// Recreate the physics state, which includes an instance of the CollisionBodySetup.
+	RecreatePhysicsState();
 }

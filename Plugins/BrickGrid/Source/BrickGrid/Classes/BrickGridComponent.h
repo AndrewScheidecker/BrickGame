@@ -41,6 +41,7 @@ public:
 
 	// Begin USceneComponent interface.
 	virtual FBoxSphereBounds CalcBounds(const FTransform & LocalToWorld) const OVERRIDE;
+	virtual class UBodySetup* GetBodySetup() OVERRIDE;
 	// End USceneComponent interface.
 
 	// Begin UMeshComponent interface.
@@ -48,6 +49,10 @@ public:
 	// End UMeshComponent interface.
 
 private:
+
+	// Collision body.
+	UPROPERTY(transient, duplicatetransient)
+	class UBodySetup* CollisionBodySetup;
 
 	// Contains the material index for each brick, packed into 32-bit integers.
 	UPROPERTY()
@@ -87,4 +92,7 @@ private:
 
 	// Calculates the index in BrickContents, the shift, and the mask for the brick at some coordinates. The mask is in terms of the bits that have been shifted so the LSB is in bit 0.
 	void CalcIndexShiftMask(uint32 X,uint32 Y,uint32 Z,uint32& OutDWordIndex,uint32& OutShift,uint32& OutMask) const;
+
+	// Initializes the collision body.
+	void UpdateCollisionBody();
 };
