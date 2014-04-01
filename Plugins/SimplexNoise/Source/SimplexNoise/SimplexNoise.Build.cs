@@ -24,10 +24,7 @@ namespace UnrealBuildTool.Rules
 				{
 					"Core",
 					"CoreUObject",
-					"Engine",
-					"UnrealEd",
-					"GraphEditor",
-					"BlueprintGraph"
+					"Engine"
 				}
 				);
 
