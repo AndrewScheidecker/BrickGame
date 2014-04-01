@@ -434,7 +434,7 @@ void UBrickGridComponent::CalcIndexShiftMask(uint32 X,uint32 Y,uint32 Z,uint32& 
 	const uint32 SubDWordIndex = BrickIndex & ((1 << BricksPerDWordLog2) - 1);
 	OutDWordIndex = BrickIndex >> BricksPerDWordLog2;
 	OutShift = SubDWordIndex << BitsPerBrickLog2;
-	OutMask = (1 << BitsPerBrickLog2) - 1;
+	OutMask = (1 << BitsPerBrick) - 1;
 }
 
 UBrickGridComponent::UBrickGridComponent( const FPostConstructInitializeProperties& PCIP )
