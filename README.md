@@ -1,10 +1,14 @@
 # Overview
 
-This is a simple game (little modified from the first-person template that comes with UE4), meant to demonstrate the BrickGridComponent plugin.
+This is a simple game (little modified from the first-person template that comes with UE4), meant to demonstrate the BrickGrid plugin (https://github.com/AndrewScheidecker/BrickGame/tree/master/Plugins/BrickGrid/Source/BrickGrid).
 
-BrickGridComponent is a PrimitiveComponent class that reproduces Minecraft-style voxel rendering. The grid's "bricks" are cubes that may contain some material.
+BrickGrid adds a PrimitiveComponent class that reproduces Minecraft-style voxel rendering. The grid's "bricks" are cubes that may contain some material.
 
 Rendering works, and collision works (in a flaky way), but both are not set up for real-time updates to subsets of the bricks. The current code will recreate the rendering resources for the entire grid if only a single voxel changes, so it isn't quite capable of allowing players to modify it during gameplay.
+
+All of the procedural terrain generation happens in BluePrint, but it uses a simplex noise function implemented in C++ (https://github.com/AndrewScheidecker/BrickGame/tree/master/Plugins/SimplexNoise).
+
+The BrickGrid, SuperLoop, and SimplexNoise plugins don't have any dependencies apart from built-in UE4 modules, so it should be easy to drop them into your own game individually or as a group.
 
 # License
 
