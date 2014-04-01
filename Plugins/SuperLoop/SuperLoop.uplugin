@@ -1,0 +1,20 @@
+{
+    "FileVersion" : 3,
+	
+	"FriendlyName" : "SuperLoop",
+	"Version" : 1,
+	"VersionName" : "1.0",
+	"CreatedBy" : "Andrew Scheidecker",
+	"CreatedByURL" : "http://www.scheidecker.net/",
+	"EngineVersion" : 1579795,
+	"Description" : "A plugin that provides a function reset the runaway loop counter that prevents large loops in BluePrint.",
+	"Category" : "Blueprint",
+	
+    "Modules" :
+	[
+		{
+			"Name" : "SuperLoop",
+			"Type" : "Runtime"
+		}
+	]
+}
