@@ -187,14 +187,14 @@ public:
 								const int32 Z = ChunkBaseZ + ChunkZ;
 
 								// Only draw faces of bricks that aren't empty.
-								const uint32 BrickMaterial = Component->Get(X,Y,Z);
+								const uint32 BrickMaterial = Component->GetBrick(X,Y,Z);
 								if (BrickMaterial != Component->GetEmptyMaterialIndex())
 								{
 									for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
 									{
 										// Only draw faces that face empty bricks.
 										const FIntVector FrontBrickXYZ = FIntVector(X, Y, Z) + FaceNormal[FaceIndex];
-										if (Component->Get(FrontBrickXYZ) == Component->GetEmptyMaterialIndex())
+										if (Component->GetBrick(FrontBrickXYZ) == Component->GetEmptyMaterialIndex())
 										{
 											// Compute the tangent basis for the face.
 											const FVector FaceTangentX(BrickVertices[FaceVertices[FaceIndex][2]] - BrickVertices[FaceVertices[FaceIndex][0]]);
@@ -387,11 +387,11 @@ void UBrickGridComponent::Init(int32 InSizeX,int32 InSizeY,int32 InSizeZ,int32 I
 	BrickContents.Init(0, FMath::DivideAndRoundUp<uint32>(SizeX * SizeY * SizeZ * BitsPerBrick, 32));
 }
 
-int32 UBrickGridComponent::Get(const FIntVector& XYZ) const
+int32 UBrickGridComponent::GetBrick(const FIntVector& XYZ) const
 {
-	return Get(XYZ.X,XYZ.Y,XYZ.Z);
+	return GetBrick(XYZ.X,XYZ.Y,XYZ.Z);
 }
-int32 UBrickGridComponent::Get(int32 X,int32 Y,int32 Z) const
+int32 UBrickGridComponent::GetBrick(int32 X,int32 Y,int32 Z) const
 {
 	if (X >= 0 && X < (int32)SizeX && Y >= 0 && Y < (int32)SizeY && Z >= 0 && Z < (int32)SizeZ)
 	{
@@ -407,11 +407,11 @@ int32 UBrickGridComponent::Get(int32 X,int32 Y,int32 Z) const
 	}
 }
 
-void UBrickGridComponent::Set(const FIntVector& XYZ,int32 MaterialIndex)
+void UBrickGridComponent::SetBrick(const FIntVector& XYZ,int32 MaterialIndex)
 {
-	return Set(XYZ.X,XYZ.Y,XYZ.Z,MaterialIndex);
+	return SetBrick(XYZ.X,XYZ.Y,XYZ.Z,MaterialIndex);
 }
-void UBrickGridComponent::Set(int32 X,int32 Y,int32 Z,int32 MaterialIndex)
+void UBrickGridComponent::SetBrick(int32 X,int32 Y,int32 Z,int32 MaterialIndex)
 {
 	if (X >= 0 && X < (int32)SizeX && Y >= 0 && Y < (int32)SizeY && Z >= 0 && Z < (int32)SizeZ)
 	{
@@ -482,14 +482,14 @@ void UBrickGridComponent::UpdateCollisionBody()
 			for (uint32 X = 0; X < SizeX; ++X)
 			{
 				// Only create collision boxes for bricks that aren't empty.
-				const uint32 BrickMaterial = Get(X,Y,Z);
+				const uint32 BrickMaterial = GetBrick(X,Y,Z);
 				if (BrickMaterial != GetEmptyMaterialIndex())
 				{
 					// Only create collision boxes for bricks that are adjacent to an empty brick.
 					bool HasEmptyNeighbor = false;
 					for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 					{
-						if(Get(FIntVector(X,Y,Z) + FaceNormal[FaceIndex]) == GetEmptyMaterialIndex())
+						if(GetBrick(FIntVector(X,Y,Z) + FaceNormal[FaceIndex]) == GetEmptyMaterialIndex())
 						{
 							HasEmptyNeighbor = true;
 							break;

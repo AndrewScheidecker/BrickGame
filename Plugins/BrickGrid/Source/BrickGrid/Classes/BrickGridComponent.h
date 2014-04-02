@@ -20,13 +20,13 @@ public:
 
 	/** Reads the material index of the brick at some coordinates. A read from out-of-bounds coordinates returns EmptyMaterialIndex. */
 	UFUNCTION(BlueprintCallable, Category = BrickGrid)
-	int32 Get(int32 X,int32 Y,int32 Z) const;
-	int32 Get(const FIntVector& XYZ) const;
+	int32 GetBrick(int32 X,int32 Y,int32 Z) const;
+	int32 GetBrick(const FIntVector& XYZ) const;
 
 	/** Writes the material of the brick at some coordinates. */
 	UFUNCTION(BlueprintCallable, Category = BrickGrid)
-	void Set(int32 X,int32 Y,int32 Z,int32 MaterialIndex);
-	void Set(const FIntVector& XYZ,int32 MaterialIndex);
+	void SetBrick(int32 X,int32 Y,int32 Z,int32 MaterialIndex);
+	void SetBrick(const FIntVector& XYZ, int32 MaterialIndex);
 
 	// Accessors.
 	uint32 GetSizeX() const { return SizeX; }
