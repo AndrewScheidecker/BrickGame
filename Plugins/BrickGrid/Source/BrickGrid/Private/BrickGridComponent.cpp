@@ -504,11 +504,11 @@ void UBrickGridComponent::UpdateCollisionBody()
 						const FVector AbsScale3D = ComponentToWorld.GetScale3D().GetAbs();
 						const FVector NonUniformScale3D = AbsScale3D / AbsScale3D.GetMin();
 
-						// Set the box center and extent.
+						// Set the box center and size.
 						BoxElement.Center = FVector((X + 0.5f) * NonUniformScale3D.X, (Y + 0.5f) * NonUniformScale3D.Y, (Z + 0.5f) * NonUniformScale3D.Z);
-						BoxElement.X = 0.5f * NonUniformScale3D.X;
-						BoxElement.Y = 0.5f * NonUniformScale3D.Y;
-						BoxElement.Z = 0.5f * NonUniformScale3D.Z;
+						BoxElement.X = NonUniformScale3D.X;
+						BoxElement.Y = NonUniformScale3D.Y;
+						BoxElement.Z = NonUniformScale3D.Z;
 					}
 				}
 			}
