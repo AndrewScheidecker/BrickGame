@@ -293,7 +293,7 @@ public:
 		// Set up the wireframe material instance.
 		const bool bWireframe = View->Family->EngineShowFlags.Wireframe;
 		FColoredMaterialRenderProxy WireframeMaterialInstance(
-			GEngine->WireframeMaterial->GetRenderProxy(IsSelected()),
+			WITH_EDITOR ? GEngine->WireframeMaterial->GetRenderProxy(IsSelected()) : NULL,
 			FLinearColor(0, 0.5f, 1.f)
 			);
 
