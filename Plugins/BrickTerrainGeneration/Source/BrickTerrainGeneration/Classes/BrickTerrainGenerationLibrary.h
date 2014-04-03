@@ -10,6 +10,10 @@ struct FBrickTerrainGenerationParameters
 {
 	GENERATED_USTRUCT_BODY()
 
+	// A random seed for the terrain.
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	int32 Seed;
+
 	// The number of world-units per noise parameter unit for the height-map.
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
 	float HeightNoiseScale;
@@ -23,7 +27,8 @@ struct FBrickTerrainGenerationParameters
 	int32 DirtMaterialIndex;
 
 	FBrickTerrainGenerationParameters()
-	: HeightNoiseScale(10000.0f)
+	: Seed()
+	, HeightNoiseScale(10000.0f)
 	, RockMaterialIndex()
 	, DirtMaterialIndex()
 	{}
