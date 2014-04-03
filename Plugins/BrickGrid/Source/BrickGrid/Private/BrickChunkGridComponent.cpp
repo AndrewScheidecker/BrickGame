@@ -15,7 +15,7 @@ UBrickChunkGridComponent::UBrickChunkGridComponent(const FPostConstructInitializ
 	ChunkParameters.Materials.Add(FBrickMaterial());
 	ChunkParameters.EmptyMaterialIndex = 0;
 	ChunkDrawRadius = 10000.0f;
-	MaxChunksAllocatedPerFrame = 50;
+	MaxChunksAllocatedPerFrame = 10;
 	ChunkClass = UBrickChunkComponent::StaticClass();
 
 	MinChunkCoordinates = FChunkCoordinates(INT_MIN,INT_MIN,0);
@@ -36,12 +36,13 @@ void UBrickChunkGridComponent::UpdateCameraPosition(const FVector& WorldCameraPo
 	const int32 MaxChunkY = FMath::Min(MaxChunkCoordinates.Y,FMath::Ceil((LocalCameraPosition.Y + LocalChunkDrawRadius) / ChunkParameters.SizeY));
 	const int32 MaxChunkZ = FMath::Min(MaxChunkCoordinates.Z,FMath::Ceil((LocalCameraPosition.Z + LocalChunkDrawRadius) / ChunkParameters.SizeZ));
 
+	const int32 MaxChunksAllocatedThisFrame = ChunkMap.Num() > 0 ? MaxChunksAllocatedPerFrame : INT_MAX;
 	int32 ChunksAllocatedThisFrame = 0;
-	for(int32 ChunkZ = MinChunkZ;ChunkZ <= MaxChunkZ && ChunksAllocatedThisFrame < MaxChunksAllocatedPerFrame;++ChunkZ)
+	for(int32 ChunkZ = MinChunkZ;ChunkZ <= MaxChunkZ && ChunksAllocatedThisFrame < MaxChunksAllocatedThisFrame;++ChunkZ)
 	{
-		for(int32 ChunkY = MinChunkY;ChunkY <= MaxChunkY && ChunksAllocatedThisFrame < MaxChunksAllocatedPerFrame;++ChunkY)
+		for(int32 ChunkY = MinChunkY;ChunkY <= MaxChunkY && ChunksAllocatedThisFrame < MaxChunksAllocatedThisFrame;++ChunkY)
 		{
-			for(int32 ChunkX = MinChunkX;ChunkX <= MaxChunkX && ChunksAllocatedThisFrame < MaxChunksAllocatedPerFrame;++ChunkX)
+			for(int32 ChunkX = MinChunkX;ChunkX <= MaxChunkX && ChunksAllocatedThisFrame < MaxChunksAllocatedThisFrame;++ChunkX)
 			{
 				const FChunkCoordinates Coordinates(ChunkX,ChunkY,ChunkZ);
 				const UBrickChunkComponent* Chunk = ChunkMap.FindRef(Coordinates);
