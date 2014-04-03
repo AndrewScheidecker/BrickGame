@@ -8,7 +8,7 @@
 /**
  * The public interface to this module
  */
-class IBrickGridPlugin : public IModuleInterface
+class IBrickTerrainGenerationPlugin : public IModuleInterface
 {
 
 public:
@@ -19,9 +19,9 @@ public:
 	 *
 	 * @return Returns singleton instance, loading the module on demand if needed
 	 */
-	static inline IBrickGridPlugin& Get()
+	static inline IBrickTerrainGenerationPlugin& Get()
 	{
-		return FModuleManager::LoadModuleChecked< IBrickGridPlugin >( "BrickGrid" );
+		return FModuleManager::LoadModuleChecked< IBrickTerrainGenerationPlugin >( "BrickTerrainGeneration" );
 	}
 
 	/**
@@ -31,7 +31,7 @@ public:
 	 */
 	static inline bool IsAvailable()
 	{
-		return FModuleManager::Get().IsModuleLoaded( "BrickGrid" );
+		return FModuleManager::Get().IsModuleLoaded( "BrickTerrainGeneration" );
 	}
 };
 

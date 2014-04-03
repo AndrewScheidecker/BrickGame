@@ -1,0 +1,21 @@
+{
+    "PluginFileVersion" : 1,
+	
+	"FriendlyName" : "BrickTerrainGeneration",
+	"Version" : 1,
+	"VersionName" : "1.0",
+	"CreatedBy" : "Andrew Scheidecker",
+	"CreatedByURL" : "http://www.scheidecker.net",
+	"MinEngineVersion" : 1579795,
+	"Description" : "A component that generates procedural terrain for a BrickGrid",
+	"CategoryPath" : "Rendering.Components",
+	
+    "Modules" :
+	[
+		{
+			"Name" : "BrickTerrainGeneration",
+			"Type" : "Runtime",
+			"BlacklistPlatforms" : [ "HTML5" ]
+		}
+	]
+}

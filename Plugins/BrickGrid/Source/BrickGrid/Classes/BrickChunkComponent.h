@@ -53,21 +53,21 @@ public:
 		Each brick may be one of BrickMaterialCount materials.
 		EmptyMaterialIndex is the index of the material that denotes an empty brick. */
 	UFUNCTION(BlueprintCallable, Category = Bricks)
-	void Init(const FBrickChunkParameters& Parameters);
+	BRICKGRID_API void Init(const FBrickChunkParameters& Parameters);
 
 	/** Reads the material index of the brick at some coordinates. A read from out-of-bounds coordinates returns EmptyMaterialIndex. */
 	UFUNCTION(BlueprintCallable, Category = Bricks)
-	int32 GetBrick(int32 X,int32 Y,int32 Z) const;
-	int32 GetBrick(const FIntVector& XYZ) const;
+	BRICKGRID_API int32 GetBrick(int32 X,int32 Y,int32 Z) const;
+	BRICKGRID_API int32 GetBrick(const FIntVector& XYZ) const;
 
 	/** Writes the material of the brick at some coordinates. */
 	UFUNCTION(BlueprintCallable, Category = Bricks)
-	void SetBrick(int32 X,int32 Y,int32 Z,int32 MaterialIndex);
-	void SetBrick(const FIntVector& XYZ, int32 MaterialIndex);
+	BRICKGRID_API void SetBrick(int32 X,int32 Y,int32 Z,int32 MaterialIndex);
+	BRICKGRID_API void SetBrick(const FIntVector& XYZ, int32 MaterialIndex);
 
 	/** Accesses the brick's parameters. */
 	UFUNCTION(BlueprintCallable,Category=Bricks)
-	const FBrickChunkParameters& GetParameters() const;
+	BRICKGRID_API const FBrickChunkParameters& GetParameters() const;
 
 	// Begin UPrimitiveComponent interface.
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() OVERRIDE;
