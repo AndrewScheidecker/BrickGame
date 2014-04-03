@@ -78,26 +78,28 @@ FBoxSphereBounds UBrickChunkGridComponent::CalcBounds(const FTransform & LocalTo
 	return FBoxSphereBounds(FVector(0,0,0),FVector(1,1,1) * HALF_WORLD_MAX,FMath::Sqrt(3.0f * HALF_WORLD_MAX));
 }
 
-void UBrickChunkGridComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	if(PropertyChangedEvent.Property != NULL)
+#if WITH_EDITOR
+	void UBrickChunkGridComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 	{
-		const FName PropertyName = PropertyChangedEvent.Property->GetFName();
-		if(PropertyName == FName(TEXT("ChunkParameters")))
+		if(PropertyChangedEvent.Property != NULL)
 		{
-			// Limit each chunk to 255x255x255 bricks, which is the limit of what can be rendered using 8-bit relative vertex positions.
-			ChunkParameters.SizeX = (uint32)FMath::Clamp(ChunkParameters.SizeX, 0, 255);
-			ChunkParameters.SizeY = (uint32)FMath::Clamp(ChunkParameters.SizeY, 0, 255);
-			ChunkParameters.SizeZ = (uint32)FMath::Clamp(ChunkParameters.SizeZ, 0, 255);
+			const FName PropertyName = PropertyChangedEvent.Property->GetFName();
+			if(PropertyName == FName(TEXT("ChunkParameters")))
+			{
+				// Limit each chunk to 255x255x255 bricks, which is the limit of what can be rendered using 8-bit relative vertex positions.
+				ChunkParameters.SizeX = (uint32)FMath::Clamp(ChunkParameters.SizeX, 0, 255);
+				ChunkParameters.SizeY = (uint32)FMath::Clamp(ChunkParameters.SizeY, 0, 255);
+				ChunkParameters.SizeZ = (uint32)FMath::Clamp(ChunkParameters.SizeZ, 0, 255);
 
-			// Validate the empty material index.
-			ChunkParameters.EmptyMaterialIndex = FMath::Clamp<int32>(ChunkParameters.EmptyMaterialIndex, 0, ChunkParameters.Materials.Num());
+				// Validate the empty material index.
+				ChunkParameters.EmptyMaterialIndex = FMath::Clamp<int32>(ChunkParameters.EmptyMaterialIndex, 0, ChunkParameters.Materials.Num());
+			}
+			else if(PropertyName == FName(TEXT("ChunkDrawRadius")))
+			{
+				ChunkDrawRadius = FMath::Max(0.0f,ChunkDrawRadius);
+			}
 		}
-		else if(PropertyName == FName(TEXT("ChunkDrawRadius")))
-		{
-			ChunkDrawRadius = FMath::Max(0.0f,ChunkDrawRadius);
-		}
+
+		Super::PostEditChangeProperty(PropertyChangedEvent);
 	}
-
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-}
+#endif

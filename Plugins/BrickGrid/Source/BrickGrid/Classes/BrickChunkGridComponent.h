@@ -82,7 +82,9 @@ public:
 	// End USceneComponent interface.
 
 	// Begin UObject interface.
-	virtual void PostEditChangeProperty( struct FPropertyChangedEvent& PropertyChangedEvent) OVERRIDE;
+	#if WITH_EDITOR
+		virtual void PostEditChangeProperty( struct FPropertyChangedEvent& PropertyChangedEvent) OVERRIDE;
+	#endif
 	// End UObject interface.
 
 private:
