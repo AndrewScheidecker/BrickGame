@@ -151,15 +151,7 @@ public:
 		// Batch the faces by material and direction.
 		struct FMaterialBatch
 		{
-			TArray<int32> Indices[6];
-			FBox Bounds[6];
-			FMaterialBatch()
-			{
-				for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
-				{
-					Bounds[FaceIndex].Init();
-				}
-			}
+			TArray<int32> Indices;
 		};
 		TArray<FMaterialBatch> MaterialBatches;
 		MaterialBatches.Init(FMaterialBatch(),Component->GetParameters().Materials.Num());
@@ -187,18 +179,15 @@ public:
 								{
 									const FIntVector Position = FIntVector(X,Y,Z) + BrickVertices[FaceVertices[FaceIndex][FaceVertexIndex]];
 									new(VertexBuffer.Vertices) FBrickVertex(Position,FaceUVs[FaceVertexIndex],PackedFaceTangentX[FaceIndex],PackedFaceTangentZ[FaceIndex]);
-
-									// Include the vertex in the batch's bounding box.
-									MaterialBatches[BrickMaterial].Bounds[FaceIndex] += (FVector)Position;
 								}
 
 								// Write the indices for the brick face.
-								MaterialBatches[BrickMaterial].Indices[FaceIndex].Add(BaseFaceVertexIndex + 0);
-								MaterialBatches[BrickMaterial].Indices[FaceIndex].Add(BaseFaceVertexIndex + 1);
-								MaterialBatches[BrickMaterial].Indices[FaceIndex].Add(BaseFaceVertexIndex + 2);
-								MaterialBatches[BrickMaterial].Indices[FaceIndex].Add(BaseFaceVertexIndex + 0);
-								MaterialBatches[BrickMaterial].Indices[FaceIndex].Add(BaseFaceVertexIndex + 2);
-								MaterialBatches[BrickMaterial].Indices[FaceIndex].Add(BaseFaceVertexIndex + 3);
+								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 0);
+								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 1);
+								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 2);
+								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 0);
+								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 2);
+								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 3);
 							}
 						}
 					}
@@ -209,28 +198,15 @@ public:
 		// Create mesh elements for each batch.
 		for (int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
 		{
-			for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
+			if (MaterialBatches[MaterialIndex].Indices.Num() > 0)
 			{
-				if (MaterialBatches[MaterialIndex].Indices[FaceIndex].Num() > 0)
-				{
-					FElement& Element = *new(Elements)FElement;
-					Element.FirstIndex = IndexBuffer.Indices.Num();
-					Element.NumPrimitives = MaterialBatches[MaterialIndex].Indices[FaceIndex].Num() / 3;
-					Element.MaterialIndex = MaterialIndex;
-					Element.LocalBounds = MaterialBatches[MaterialIndex].Bounds[FaceIndex];
-					// Create a plane parallel to the faces with all the element's faces on or in front of the plane.
-					// Any viewers behind this plane cannot see any faces of the element.
-					Element.LocalViewBoundingPlane = FPlane(
-						(FVector)FaceNormal[FaceIndex],
-						-FMath::Min(
-							Element.LocalBounds.Min | (FVector)FaceNormal[FaceIndex],
-							Element.LocalBounds.Max | (FVector)FaceNormal[FaceIndex]
-							)
-						);
+				FElement& Element = *new(Elements)FElement;
+				Element.FirstIndex = IndexBuffer.Indices.Num();
+				Element.NumPrimitives = MaterialBatches[MaterialIndex].Indices.Num() / 3;
+				Element.MaterialIndex = MaterialIndex;
 
-					// Append the batch's indices to the index buffer.
-					IndexBuffer.Indices.Append(MaterialBatches[MaterialIndex].Indices[FaceIndex]);
-				}
+				// Append the batch's indices to the index buffer.
+				IndexBuffer.Indices.Append(MaterialBatches[MaterialIndex].Indices);
 			}
 		}
 
@@ -259,46 +235,42 @@ public:
 		VertexFactory.ReleaseResource();
 	}
 
-	virtual void DrawDynamicElements(FPrimitiveDrawInterface* PDI,const FSceneView* View)
+	virtual void OnTransformChanged() OVERRIDE
+	{
+		// Create a uniform buffer with the transform for the chunk.
+		PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate(FScaleMatrix(FVector(255, 255, 255)) * GetLocalToWorld(), GetBounds(), GetLocalBounds(), true);
+	}
+
+	virtual void DrawDynamicElements(FPrimitiveDrawInterface* PDI,const FSceneView* View) OVERRIDE
 	{
 		// Set up the wireframe material instance.
-		const bool bWireframe = View->Family->EngineShowFlags.Wireframe;
 		FColoredMaterialRenderProxy WireframeMaterialInstance(
 			WITH_EDITOR ? GEngine->WireframeMaterial->GetRenderProxy(IsSelected()) : NULL,
 			FLinearColor(0, 0.5f, 1.f)
 			);
 
-		// Create a uniform buffer with the transform for the chunk.
-		auto UniformBuffer = CreatePrimitiveUniformBufferImmediate(FScaleMatrix(FVector(255, 255, 255)) * GetLocalToWorld(), GetBounds(), GetLocalBounds(), true);
-
 		// Draw the mesh elements.
 		for (int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
-			const FElement& Element = Elements[ElementIndex];
-			FMeshBatch Mesh;
-			Mesh.bWireframe = bWireframe;
-			Mesh.VertexFactory = &VertexFactory;
-			Mesh.MaterialRenderProxy = bWireframe ? &WireframeMaterialInstance : Materials[Element.MaterialIndex]->GetRenderProxy(IsSelected());
-			Mesh.ReverseCulling = IsLocalToWorldDeterminantNegative();
-			Mesh.Type = PT_TriangleList;
-			Mesh.DepthPriorityGroup = SDPG_World;
-			Mesh.CastShadow = true;
-			Mesh.Elements[0].FirstIndex = Element.FirstIndex;
-			Mesh.Elements[0].NumPrimitives = Element.NumPrimitives;
-			Mesh.Elements[0].MinVertexIndex = IndexBuffer.Indices[Element.FirstIndex];
-			Mesh.Elements[0].MaxVertexIndex = IndexBuffer.Indices[Element.FirstIndex + Element.NumPrimitives * 3 - 1];
-			Mesh.Elements[0].IndexBuffer = &IndexBuffer;
-			Mesh.Elements[0].PrimitiveUniformBuffer = UniformBuffer;
-			PDI->DrawMesh(Mesh);
+			PDI->DrawMesh(GetMeshBatch(ElementIndex, &WireframeMaterialInstance));
 		}
 	}
 
-	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View)
+	virtual void DrawStaticElements(FStaticPrimitiveDrawInterface* PDI) OVERRIDE
+	{
+		for (int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
+		{
+			PDI->DrawMesh(GetMeshBatch(ElementIndex,false),0,FLT_MAX);
+		}
+	}
+
+	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) OVERRIDE
 	{
 		FPrimitiveViewRelevance Result;
 		Result.bDrawRelevance = IsShown(View);
 		Result.bShadowRelevance = IsShadowCast(View);
-		Result.bDynamicRelevance = true;
+		Result.bDynamicRelevance = View->Family->EngineShowFlags.Wireframe || IsSelected();
+		Result.bStaticRelevance = !Result.bDynamicRelevance;
 		MaterialRelevance.SetPrimitiveViewRelevance(Result);
 		return Result;
 	}
@@ -321,15 +293,34 @@ private:
 	{
 		uint32 FirstIndex;
 		uint32 NumPrimitives;
-		uint32 ChunkIndex;
 		uint32 MaterialIndex;
-		FPlane LocalViewBoundingPlane;
-		FBox LocalBounds;
 	};
 	TArray<FElement> Elements;
 
 	TArray<UMaterialInterface*> Materials;
 	FMaterialRelevance MaterialRelevance;
+
+	TUniformBufferRef<FPrimitiveUniformShaderParameters> PrimitiveUniformBuffer;
+
+	FMeshBatch GetMeshBatch(int32 ElementIndex,FMaterialRenderProxy* WireframeMaterialInstance)
+	{
+		const FElement& Element = Elements[ElementIndex];
+		FMeshBatch Mesh;
+		Mesh.bWireframe = WireframeMaterialInstance != NULL;
+		Mesh.VertexFactory = &VertexFactory;
+		Mesh.MaterialRenderProxy = WireframeMaterialInstance ? WireframeMaterialInstance : Materials[Element.MaterialIndex]->GetRenderProxy(IsSelected());
+		Mesh.ReverseCulling = IsLocalToWorldDeterminantNegative();
+		Mesh.Type = PT_TriangleList;
+		Mesh.DepthPriorityGroup = SDPG_World;
+		Mesh.CastShadow = true;
+		Mesh.Elements[0].FirstIndex = Element.FirstIndex;
+		Mesh.Elements[0].NumPrimitives = Element.NumPrimitives;
+		Mesh.Elements[0].MinVertexIndex = IndexBuffer.Indices[Element.FirstIndex];
+		Mesh.Elements[0].MaxVertexIndex = IndexBuffer.Indices[Element.FirstIndex + Element.NumPrimitives * 3 - 1];
+		Mesh.Elements[0].IndexBuffer = &IndexBuffer;
+		Mesh.Elements[0].PrimitiveUniformBuffer = PrimitiveUniformBuffer;
+		return Mesh;
+	}
 };
 
 void UBrickChunkComponent::Init(const FBrickChunkParameters& InParameters)
