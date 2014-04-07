@@ -1,7 +1,7 @@
 {
     "FileVersion" : 3,
 	
-	"FriendlyName" : "SuperLoop",
+	"FriendlyName" : "Super Loop Library",
 	"Version" : 1,
 	"VersionName" : "1.0",
 	"CreatedBy" : "Andrew Scheidecker",
@@ -13,7 +13,7 @@
     "Modules" :
 	[
 		{
-			"Name" : "SuperLoop",
+			"Name" : "SuperLoopLibrary",
 			"Type" : "Runtime"
 		}
 	]

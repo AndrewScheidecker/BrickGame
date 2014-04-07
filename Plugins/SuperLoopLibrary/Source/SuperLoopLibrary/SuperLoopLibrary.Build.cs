@@ -2,12 +2,12 @@
 
 namespace UnrealBuildTool.Rules
 {
-	public class SuperLoop : ModuleRules
+	public class SuperLoopLibrary : ModuleRules
 	{
-		public SuperLoop(TargetInfo Target)
+		public SuperLoopLibrary(TargetInfo Target)
 		{
 			PrivateIncludePaths.AddRange(new string[] {
-				"Developer/SuperLoop/Private"
+				"Developer/SuperLoopLibrary/Private"
 				});
 			PublicDependencyModuleNames.AddRange(new string[] {
 				"Core",

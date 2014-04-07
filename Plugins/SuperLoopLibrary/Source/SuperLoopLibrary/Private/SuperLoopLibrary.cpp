@@ -1,9 +1,9 @@
 // Copyright 2014, Andrew Scheidecker. All Rights Reserved. 
 
 #include "SuperLoopLibrary.h"
-#include "SuperLoop.generated.inl"
+#include "SuperLoopLibrary.generated.inl"
 
-IMPLEMENT_MODULE( IModuleInterface, SuperLoop )
+IMPLEMENT_MODULE( IModuleInterface, SuperLoopLibrary )
 
 USuperLoopLibrary::USuperLoopLibrary(const class FPostConstructInitializeProperties& PCIP) : Super(PCIP) {}
 
