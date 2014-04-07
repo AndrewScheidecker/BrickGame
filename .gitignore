@@ -11,6 +11,7 @@
 /Plugins/**/Intermediate/**
 /Plugins/**/Binaries/**
 /Binaries/**
+/DerivedDataCache/**
 
 **.generated.h
 **.response
