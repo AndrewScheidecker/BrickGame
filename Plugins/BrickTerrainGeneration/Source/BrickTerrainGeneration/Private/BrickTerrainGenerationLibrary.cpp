@@ -2,7 +2,7 @@
 
 #include "BrickTerrainGenerationPluginPrivatePCH.h"
 #include "BrickTerrainGenerationLibrary.h"
-#include "BrickChunkComponent.h"
+#include "BrickGridComponent.h"
 #include "SimplexNoise.h"
 
 ISimplexNoise* SimplexNoiseModule = NULL;
@@ -11,33 +11,36 @@ UBrickTerrainGenerationLibrary::UBrickTerrainGenerationLibrary( const FPostConst
 : Super( PCIP )
 {}
 
-void UBrickTerrainGenerationLibrary::InitChunk(const FBrickTerrainGenerationParameters& Parameters,class UBrickChunkComponent* Chunk)
+void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationParameters& Parameters,class UBrickGridComponent* Grid,const FInt3& RegionCoordinates)
 {
 	if(SimplexNoiseModule == NULL)
 	{
 		SimplexNoiseModule = &ISimplexNoise::Get();
 	}
 
-	const FMatrix ChunkToWorld = Chunk->GetComponentToWorld().ToMatrixWithScale();
-	const FBrickChunkParameters& ChunkParameters = Chunk->GetParameters();
-	const float InvHeightNoiseScale = 1.0f / Parameters.HeightNoiseScale;
+	const FVector2D NoiseScale2D = FVector2D(Grid->GetComponentScale()) / Parameters.HeightNoiseScale;
+	const int32 MinBrickZ = Grid->MinBrickCoordinates.Z;
+	const int32 SizeZ = Grid->MaxBrickCoordinates.Z - MinBrickZ;
 
-	for(int32 Y = 0;Y < ChunkParameters.SizeY;++Y)
+	const FInt3 BricksPerRegion = Grid->BricksPerRegion;
+	const FInt3 MinBrickCoordinates = RegionCoordinates * BricksPerRegion;
+	const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerRegion;
+	for(int32 Y = MinBrickCoordinates.Y;Y < MaxBrickCoordinatesPlus1.Y;++Y)
 	{
-		for(int32 X = 0;X < ChunkParameters.SizeX;++X)
+		for(int32 X = MinBrickCoordinates.X;X < MaxBrickCoordinatesPlus1.X;++X)
 		{
-			const FVector WorldXY = ChunkToWorld.TransformPosition(FVector(X,Y,0));
-			const float DirtHeight = 0.3f + 0.3f * SimplexNoiseModule->Sample2D(Parameters.Seed * 71 + WorldXY.X * InvHeightNoiseScale,WorldXY.Y * InvHeightNoiseScale);
-			const float RockHeight = 0.01f + 0.99f * SimplexNoiseModule->Sample2D(Parameters.Seed * 67 + WorldXY.X * InvHeightNoiseScale,WorldXY.Y * InvHeightNoiseScale)
-									- 0.05f + 0.1f * SimplexNoiseModule->Sample2D(Parameters.Seed * 67 + WorldXY.X * InvHeightNoiseScale * 100,WorldXY.Y * InvHeightNoiseScale * 100);
+			const FVector2D NoiseXY = FVector2D(X,Y) * NoiseScale2D;
+			const float DirtHeight = 0.3f + 0.3f * SimplexNoiseModule->Sample2D(Parameters.Seed * 71 + NoiseXY.X,NoiseXY.Y);
+			const float RockHeight = 0.01f + 0.99f * SimplexNoiseModule->Sample2D(Parameters.Seed * 67 + NoiseXY.X,NoiseXY.Y)
+									- 0.05f + 0.1f * SimplexNoiseModule->Sample2D(Parameters.Seed * 67 + NoiseXY.X * 100,NoiseXY.Y * 100);
 
-			const int32 DirtBrickHeight = FMath::Clamp(FMath::Ceil(ChunkParameters.SizeZ * DirtHeight),0,ChunkParameters.SizeZ);
-			const int32 RockBrickHeight = FMath::Clamp(FMath::Ceil(ChunkParameters.SizeZ * RockHeight),0,ChunkParameters.SizeZ);
+			const int32 DirtBrickHeight = MinBrickZ + FMath::Clamp(FMath::Ceil(SizeZ * DirtHeight),0,SizeZ - 1);
+			const int32 RockBrickHeight = MinBrickZ + FMath::Clamp(FMath::Ceil(SizeZ * RockHeight),0,SizeZ - 1);
 			const int32 MaxBrickHeight = FMath::Max(RockBrickHeight,DirtBrickHeight);
 
-			for(int32 Z = 0;Z < MaxBrickHeight;++Z)
+			for(int32 Z = MinBrickCoordinates.Z;Z < MaxBrickHeight;++Z)
 			{
-				Chunk->SetBrick(X, Y, Z, Z < RockBrickHeight ? Parameters.RockMaterialIndex : Parameters.DirtMaterialIndex);
+				Grid->SetBrick(FInt3(X,Y,Z),Z < RockBrickHeight ? Parameters.RockMaterialIndex : Parameters.DirtMaterialIndex);
 			}
 		}
 	}

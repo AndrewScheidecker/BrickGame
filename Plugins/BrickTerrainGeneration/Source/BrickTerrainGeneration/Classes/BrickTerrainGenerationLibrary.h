@@ -3,6 +3,7 @@
 #pragma once
 #include "CoreUObject.h"
 #include "Engine.h"
+#include "BrickGridComponent.h"
 #include "BrickTerrainGenerationLibrary.generated.h"
 
 USTRUCT()
@@ -42,5 +43,5 @@ class UBrickTerrainGenerationLibrary : public UBlueprintFunctionLibrary
 public:
 
 	UFUNCTION(BlueprintCallable,Category="Terrain Generation")
-	static BRICKTERRAINGENERATION_API void InitChunk(const FBrickTerrainGenerationParameters& Parameters,class UBrickChunkComponent* Chunk);
+	static BRICKTERRAINGENERATION_API void InitRegion(const FBrickTerrainGenerationParameters& Parameters,class UBrickGridComponent* Grid,const struct FInt3& RegionCoordinates);
 };

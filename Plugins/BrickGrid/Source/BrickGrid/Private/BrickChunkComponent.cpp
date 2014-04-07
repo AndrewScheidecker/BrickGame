@@ -2,26 +2,27 @@
 
 #include "BrickGridPluginPrivatePCH.h"
 #include "BrickChunkComponent.h"
+#include "BrickGridComponent.h"
 
 // Maps brick corner indices to 3D coordinates.
-static const FIntVector BrickVertices[8] =
+static const FInt3 BrickVertices[8] =
 {
-	FIntVector(0, 0, 0),
-	FIntVector(0, 0, 1),
-	FIntVector(0, 1, 0),
-	FIntVector(0, 1, 1),
-	FIntVector(1, 0, 0),
-	FIntVector(1, 0, 1),
-	FIntVector(1, 1, 0),
-	FIntVector(1, 1, 1)
+	FInt3(0, 0, 0),
+	FInt3(0, 0, 1),
+	FInt3(0, 1, 0),
+	FInt3(0, 1, 1),
+	FInt3(1, 0, 0),
+	FInt3(1, 0, 1),
+	FInt3(1, 1, 0),
+	FInt3(1, 1, 1)
 };
 // Maps face vertex indices to UV coordinates.
-static const FIntVector FaceUVs[4] =
+static const FInt3 FaceUVs[4] =
 {
-	FIntVector(0, 255, 0),
-	FIntVector(0, 0, 0),
-	FIntVector(255, 0, 0),
-	FIntVector(255, 255, 0)
+	FInt3(0, 255, 0),
+	FInt3(0, 0, 0),
+	FInt3(255, 0, 0),
+	FInt3(255, 255, 0)
 };
 // Maps face index and face vertex index to brick corner indices.
 static const uint32 FaceVertices[6][4] =
@@ -34,14 +35,14 @@ static const uint32 FaceVertices[6][4] =
 	{ 1, 3, 7, 5 }		// +Z
 };
 // Maps face index to normal.
-static const FIntVector FaceNormal[6] =
+static const FInt3 FaceNormal[6] =
 {
-	FIntVector(-1, 0, 0),
-	FIntVector(+1, 0, 0),
-	FIntVector(0, -1, 0),
-	FIntVector(0, +1, 0),
-	FIntVector(0, 0, -1),
-	FIntVector(0, 0, +1)
+	FInt3(-1, 0, 0),
+	FInt3(+1, 0, 0),
+	FInt3(0, -1, 0),
+	FInt3(0, +1, 0),
+	FInt3(0, 0, -1),
+	FInt3(0, 0, +1)
 };
 
 /**	An element of the vertex buffer given to the GPU by the CPU brick tessellator.
@@ -58,10 +59,10 @@ struct FBrickVertex
 	uint8 Padding2;
 	FPackedNormal TangentX;
 	FPackedNormal TangentZ;
-	FBrickVertex(const FIntVector& XYZ, const FIntVector& UV, const FVector& InTangentX, const FVector& InTangentZ)
-	: X(XYZ.X)
-	, Y(XYZ.Y)
-	, Z(XYZ.Z)
+	FBrickVertex(const FInt3& Position, const FInt3& UV, const FVector& InTangentX, const FVector& InTangentZ)
+	: X(Position.X)
+	, Y(Position.Y)
+	, Z(Position.Z)
 	, U(UV.X)
 	, V(UV.Y)
 	, TangentX(FVector(InTangentX))
@@ -154,30 +155,36 @@ public:
 			TArray<int32> Indices;
 		};
 		TArray<FMaterialBatch> MaterialBatches;
-		MaterialBatches.Init(FMaterialBatch(),Component->GetParameters().Materials.Num());
+		MaterialBatches.Init(FMaterialBatch(),Component->Grid->Materials.Num());
 
 		// Iterate over each brick in the chunk.
-		for (int32 Z = 0; Z < Component->GetParameters().SizeZ; ++Z)
+		const UBrickGridComponent* Grid = Component->Grid;
+		const FInt3 BricksPerChunk = Grid->BricksPerChunk;
+		const FInt3 MinBrickCoordinates = Component->Coordinates << Grid->BricksPerChunkLog2;
+		const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerChunk + FInt3::Scalar(1);
+		const int32 EmptyMaterialIndex = Grid->EmptyMaterialIndex;
+		for (int32 Z = MinBrickCoordinates.Z; Z < MaxBrickCoordinatesPlus1.Z; ++Z)
 		{
-			for (int32 Y = 0; Y < Component->GetParameters().SizeY; ++Y)
+			for (int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
 			{
-				for (int32 X = 0; X < Component->GetParameters().SizeX; ++X)
+				for (int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
 				{
 					// Only draw faces of bricks that aren't empty.
-					const uint32 BrickMaterial = Component->GetBrick(X,Y,Z);
-					if (BrickMaterial != Component->GetParameters().EmptyMaterialIndex)
+					const FInt3 BrickCoordinates(X,Y,Z);
+					const uint32 BrickMaterial = Grid->GetBrick(BrickCoordinates);
+					if (BrickMaterial != EmptyMaterialIndex)
 					{
 						for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
 						{
 							// Only draw faces that face empty bricks.
-							const FIntVector FrontBrickXYZ = FIntVector(X, Y, Z) + FaceNormal[FaceIndex];
-							if (Component->GetBrick(FrontBrickXYZ) == Component->GetParameters().EmptyMaterialIndex)
+							const FInt3 FrontBrickXYZ = BrickCoordinates + FaceNormal[FaceIndex];
+							if (Grid->GetBrick(FrontBrickXYZ) == EmptyMaterialIndex)
 							{
 								// Write the vertices for the brick face.
 								const uint32 BaseFaceVertexIndex = VertexBuffer.Vertices.Num();
 								for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)
 								{
-									const FIntVector Position = FIntVector(X,Y,Z) + BrickVertices[FaceVertices[FaceIndex][FaceVertexIndex]];
+									const FInt3 Position = FInt3(X,Y,Z) + BrickVertices[FaceVertices[FaceIndex][FaceVertexIndex]] - MinBrickCoordinates;
 									new(VertexBuffer.Vertices) FBrickVertex(Position,FaceUVs[FaceVertexIndex],PackedFaceTangentX[FaceIndex],PackedFaceTangentZ[FaceIndex]);
 								}
 
@@ -323,70 +330,6 @@ private:
 	}
 };
 
-void UBrickChunkComponent::Init(const FBrickChunkParameters& InParameters)
-{
-	Parameters = InParameters;
-	// Compute the number of bits needed to store InMaterials.Num() values, round it up to the next power of two, and clamp it between 1-32.
-	// Rounding it to a power of two allows us to assume that the bricks for each bit end up in exactly one DWORD.
-	BitsPerBrickLog2 = FMath::Clamp<uint32>(FMath::CeilLogTwo(FMath::CeilLogTwo(GetParameters().Materials.Num())), 1, 5);
-	BitsPerBrick = 1 << BitsPerBrickLog2;
-	BricksPerDWordLog2 = 5 - BitsPerBrickLog2;
-	BrickContents.Init(0, FMath::DivideAndRoundUp<uint32>(GetParameters().SizeX * GetParameters().SizeY * GetParameters().SizeZ * BitsPerBrick, 32));
-}
-
-int32 UBrickChunkComponent::GetBrick(const FIntVector& XYZ) const
-{
-	return GetBrick(XYZ.X,XYZ.Y,XYZ.Z);
-}
-int32 UBrickChunkComponent::GetBrick(int32 X,int32 Y,int32 Z) const
-{
-	if (X >= 0 && X < (int32)GetParameters().SizeX && Y >= 0 && Y < (int32)GetParameters().SizeY && Z >= 0 && Z < (int32)GetParameters().SizeZ)
-	{
-		uint32 DWordIndex;
-		uint32 Shift;
-		uint32 Mask;
-		CalcIndexShiftMask((uint32)X,(uint32)Y,(uint32)Z,DWordIndex,Shift,Mask);
-		return (int32)((BrickContents[DWordIndex] >> Shift) & Mask);
-	}
-	else
-	{
-		return GetParameters().EmptyMaterialIndex;
-	}
-}
-
-void UBrickChunkComponent::SetBrick(const FIntVector& XYZ,int32 MaterialIndex)
-{
-	return SetBrick(XYZ.X,XYZ.Y,XYZ.Z,MaterialIndex);
-}
-void UBrickChunkComponent::SetBrick(int32 X,int32 Y,int32 Z,int32 MaterialIndex)
-{
-	if (X >= 0 && X < (int32)GetParameters().SizeX && Y >= 0 && Y < (int32)GetParameters().SizeY && Z >= 0 && Z < (int32)GetParameters().SizeZ && MaterialIndex < Parameters.Materials.Num())
-	{
-		uint32 DWordIndex;
-		uint32 Shift;
-		uint32 Mask;
-		CalcIndexShiftMask((uint32)X,(uint32)Y,(uint32)Z,DWordIndex,Shift,Mask);
-		uint32& DWord = BrickContents[DWordIndex];
-		DWord &= ~(Mask << Shift);
-		DWord |= ((uint32)MaterialIndex & Mask) << Shift;
-		MarkRenderStateDirty();
-	}
-}
-
-const FBrickChunkParameters& UBrickChunkComponent::GetParameters() const
-{
-	return Parameters;
-}
-
-void UBrickChunkComponent::CalcIndexShiftMask(uint32 X,uint32 Y,uint32 Z,uint32& OutDWordIndex,uint32& OutShift,uint32& OutMask) const
-{
-	const uint32 BrickIndex = (Z * GetParameters().SizeY + Y) * GetParameters().SizeX + X;
-	const uint32 SubDWordIndex = BrickIndex & ((1 << BricksPerDWordLog2) - 1);
-	OutDWordIndex = BrickIndex >> BricksPerDWordLog2;
-	OutShift = SubDWordIndex << BitsPerBrickLog2;
-	OutMask = (1 << BitsPerBrick) - 1;
-}
-
 UBrickChunkComponent::UBrickChunkComponent( const FPostConstructInitializeProperties& PCIP )
 	: Super( PCIP )
 {
@@ -408,17 +351,22 @@ FPrimitiveSceneProxy* UBrickChunkComponent::CreateSceneProxy()
 	return new FBrickChunkSceneProxy(this);
 }
 
+int32 UBrickChunkComponent::GetNumMaterials() const
+{
+	return Grid->Materials.Num();
+}
+
 class UMaterialInterface* UBrickChunkComponent::GetMaterial(int32 ElementIndex) const
 {
-	return ElementIndex >= 0 && ElementIndex < Parameters.Materials.Num() 
-		? Parameters.Materials[ElementIndex].SurfaceMaterial
+	return Grid != NULL && ElementIndex >= 0 && ElementIndex < Grid->Materials.Num() 
+		? Grid->Materials[ElementIndex].SurfaceMaterial
 		: NULL;
 }
 
 FBoxSphereBounds UBrickChunkComponent::CalcBounds(const FTransform & LocalToWorld) const
 {
 	FBoxSphereBounds NewBounds;
-	NewBounds.Origin = NewBounds.BoxExtent = FVector(GetParameters().SizeX,GetParameters().SizeY,GetParameters().SizeZ) / 2.0f;
+	NewBounds.Origin = NewBounds.BoxExtent = FVector(Grid->BricksPerChunk.X,Grid->BricksPerChunk.Y,Grid->BricksPerChunk.Z) / 2.0f;
 	NewBounds.SphereRadius = NewBounds.BoxExtent.Size();
 	return NewBounds.TransformBy(LocalToWorld);
 }
@@ -437,21 +385,26 @@ void UBrickChunkComponent::UpdateCollisionBody()
 	CollisionBodySetup->AggGeom.BoxElems.Reset();
 
 	// Iterate over each brick in the chunk.
-	for (int32 Z = 0; Z < GetParameters().SizeZ; ++Z)
+	const FInt3 BricksPerChunk = Grid->BricksPerChunk;
+	const FInt3 MinBrickCoordinates = Coordinates << Grid->BricksPerChunkLog2;
+	const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerChunk + FInt3::Scalar(1);
+	const int32 EmptyMaterialIndex = Grid->EmptyMaterialIndex;
+	for (int32 Z = MinBrickCoordinates.Z; Z < MaxBrickCoordinatesPlus1.Z; ++Z)
 	{
-		for (int32 Y = 0; Y < GetParameters().SizeY; ++Y)
+		for (int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
 		{
-			for (int32 X = 0; X < GetParameters().SizeX; ++X)
+			for (int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
 			{
 				// Only create collision boxes for bricks that aren't empty.
-				const int32 BrickMaterial = GetBrick(X,Y,Z);
-				if (BrickMaterial != GetParameters().EmptyMaterialIndex)
+				const FInt3 BrickCoordinates(X,Y,Z);
+				const int32 BrickMaterial = Grid->GetBrick(BrickCoordinates);
+				if (BrickMaterial != EmptyMaterialIndex)
 				{
 					// Only create collision boxes for bricks that are adjacent to an empty brick.
 					bool HasEmptyNeighbor = false;
 					for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 					{
-						if(GetBrick(FIntVector(X,Y,Z) + FaceNormal[FaceIndex]) == GetParameters().EmptyMaterialIndex)
+						if(Grid->GetBrick(BrickCoordinates + FaceNormal[FaceIndex]) == EmptyMaterialIndex)
 						{
 							HasEmptyNeighbor = true;
 							break;
@@ -467,7 +420,7 @@ void UBrickChunkComponent::UpdateCollisionBody()
 						const FVector NonUniformScale3D = AbsScale3D / AbsScale3D.GetMin();
 
 						// Set the box center and size.
-						BoxElement.Center = FVector((X + 0.5f) * NonUniformScale3D.X, (Y + 0.5f) * NonUniformScale3D.Y, (Z + 0.5f) * NonUniformScale3D.Z);
+						BoxElement.Center = ((FVector)(BrickCoordinates - MinBrickCoordinates) + FVector(0.5f)) * NonUniformScale3D;
 						BoxElement.X = NonUniformScale3D.X;
 						BoxElement.Y = NonUniformScale3D.Y;
 						BoxElement.Z = NonUniformScale3D.Z;
