@@ -1,0 +1,20 @@
+{
+    "FileVersion" : 3,
+	
+	"FriendlyName" : "Console API",
+	"Version" : 1,
+	"VersionName" : "1.0",
+	"CreatedBy" : "Andrew Scheidecker",
+	"CreatedByURL" : "http://www.scheidecker.net/",
+	"EngineVersion" : 1579795,
+	"Description" : "A plugin that allows Blueprint to register/deregister console commands.",
+	"Category" : "Blueprint",
+	
+    "Modules" :
+	[
+		{
+			"Name" : "ConsoleAPI",
+			"Type" : "Runtime"
+		}
+	]
+}
