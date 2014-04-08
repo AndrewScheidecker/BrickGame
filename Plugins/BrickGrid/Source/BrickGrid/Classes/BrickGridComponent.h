@@ -33,7 +33,7 @@ struct FBrickMaterial
 };
 
 /** A 3D integer vector. */
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType,Atomic)
 struct FInt3
 {
 	GENERATED_USTRUCT_BODY()
