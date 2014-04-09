@@ -13,14 +13,10 @@ int32 UBrickGridComponent::GetBrick(const FInt3& BrickCoordinates) const
 		if(RegionIndex != NULL)
 		{
 			const FInt3 SubregionCoordinates = BrickCoordinates - (RegionCoordinates << BricksPerRegionLog2);
-			uint32 DWordIndex;
-			uint32 Shift;
-			uint32 Mask;
-			CalcIndexShiftMask((uint32)SubregionCoordinates.X,(uint32)SubregionCoordinates.Y,(uint32)SubregionCoordinates.Z,DWordIndex,Shift,Mask);
+			const uint32 BrickIndex = (((SubregionCoordinates.Y << BricksPerRegionLog2.X) + SubregionCoordinates.X) << BricksPerRegionLog2.Z) + SubregionCoordinates.Z;
 
 			const FBrickRegion& Region = Regions[*RegionIndex];
-			const uint32& DWord = Region.BrickContents[DWordIndex];
-			return (DWord >> Shift) & Mask;
+			return Region.BrickContents[BrickIndex];
 		}
 	}
 	return EmptyMaterialIndex;
@@ -35,15 +31,10 @@ bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 Material
 		if (RegionIndex != NULL)
 		{
 			const FInt3 SubregionCoordinates = BrickCoordinates - (RegionCoordinates << BricksPerRegionLog2);
-			uint32 DWordIndex;
-			uint32 Shift;
-			uint32 Mask;
-			CalcIndexShiftMask((uint32)SubregionCoordinates.X,(uint32)SubregionCoordinates.Y,(uint32)SubregionCoordinates.Z,DWordIndex,Shift,Mask);
+			const uint32 BrickIndex = (((SubregionCoordinates.Y << BricksPerRegionLog2.X) + SubregionCoordinates.X) << BricksPerRegionLog2.Z) + SubregionCoordinates.Z;
 
 			FBrickRegion& Region = Regions[*RegionIndex];
-			uint32& DWord = Region.BrickContents[DWordIndex];
-			DWord &= ~(Mask << Shift);
-			DWord |= ((uint32)MaterialIndex & Mask) << Shift;
+			Region.BrickContents[BrickIndex] = MaterialIndex;
 
 			UBrickChunkComponent* Component = ChunkCoordinatesToComponent.FindRef(BrickToChunkCoordinates(BrickCoordinates));
 			if(Component)
@@ -115,27 +106,13 @@ void UBrickGridComponent::CreateRegion(const FInt3& Coordinates)
 	Region.Coordinates = Coordinates;
 
 	// Initialize the region's bricks to the empty material.
-	uint32 EmptyBrickDWord = 0;
-	for(uint32 Shift = 0;Shift < 32;Shift += BitsPerBrick)
-	{
-		EmptyBrickDWord |= (EmptyMaterialIndex << Shift);
-	}
-	Region.BrickContents.Init(EmptyBrickDWord,1 << (BricksPerRegionLog2.X + BricksPerRegionLog2.Y + BricksPerRegionLog2.Z - BricksPerDWordLog2));
+	Region.BrickContents.Init(EmptyMaterialIndex,1 << (BricksPerRegionLog2.X + BricksPerRegionLog2.Y + BricksPerRegionLog2.Z));
 
 	// Add the region to the coordinate map.
 	RegionCoordinatesToIndex.Add(Coordinates,RegionIndex);
 
 	// Call the InitRegion delegate for the new region.
 	OnInitRegion.Broadcast(this,Coordinates);
-}
-
-void UBrickGridComponent::CalcIndexShiftMask(uint32 X,uint32 Y,uint32 Z,uint32& OutDWordIndex,uint32& OutShift,uint32& OutMask) const
-{
-	const uint32 BrickIndex = (((Z << BricksPerRegionLog2.Y) + Y) << BricksPerRegionLog2.X) + X;
-	const uint32 SubDWordIndex = BrickIndex & ((1 << BricksPerDWordLog2) - 1);
-	OutDWordIndex = BrickIndex >> BricksPerDWordLog2;
-	OutShift = SubDWordIndex << BitsPerBrickLog2;
-	OutMask = (1 << BitsPerBrick) - 1;
 }
 
 FBoxSphereBounds UBrickGridComponent::CalcBounds(const FTransform & LocalToWorld) const
@@ -146,12 +123,6 @@ FBoxSphereBounds UBrickGridComponent::CalcBounds(const FTransform & LocalToWorld
 
 void UBrickGridComponent::ComputeDerivedConstants()
 {
-	// Compute the number of bits needed to store InMaterials.Num() values, round it up to the next power of two, and clamp it between 1-32.
-	// Rounding it to a power of two allows us to assume that the bricks for each bit end up in exactly one DWORD.
-	BitsPerBrickLog2 = FMath::Clamp<uint32>(FMath::CeilLogTwo(FMath::CeilLogTwo(Materials.Num())), 1, 5);
-	BitsPerBrick = 1 << BitsPerBrickLog2;
-	BricksPerDWordLog2 = FMath::CeilLogTwo(32) - BitsPerBrickLog2;
-
 	// Derive the chunk and region sizes from the log2 inputs.
 	BricksPerRegionLog2 = BricksPerChunkLog2 + ChunksPerRegionLog2;
 	BricksPerChunk = Exp2(BricksPerChunkLog2);

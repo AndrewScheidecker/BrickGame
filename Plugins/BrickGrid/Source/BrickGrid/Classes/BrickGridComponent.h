@@ -8,7 +8,7 @@ inline int32 SignedShiftRight(int32 A,int32 B)
 {
 	// The C standard doesn't define whether shifting a signed integer right will extend the sign bit, but the VC2013 compiler does so.
 	// If using a different compiler, assert that it does the same, although it is our problem if it does not.
-	#if 0 && defined(_MSC_VER) && _MSC_VER == 1800
+	#if defined(_MSC_VER) && _MSC_VER == 1800
 		return A >> B;
 	#else
 		const int32 Result = A >> B;
@@ -133,7 +133,7 @@ struct FBrickRegion
 
 	// Contains the material index for each brick, packed into 32-bit integers.
 	UPROPERTY()
-	TArray<uint32> BrickContents;
+	TArray<uint8> BrickContents;
 };
 
 // The type of OnInitChunk delegates.
@@ -233,18 +233,8 @@ private:
 	TMap<FInt3,int32> RegionCoordinatesToIndex;
 	TMap<FInt3,class UBrickChunkComponent*> ChunkCoordinatesToComponent;
 
-	// The number of bits used to store each brick's material index in BrickContents.
-	uint32 BitsPerBrick;
-	// Log base 2 of the number of bits used to store each brick's material index in BrickContents.
-	uint32 BitsPerBrickLog2;
-	// Log base 2 of the number of brick material indices packed into each 32-bit integer in BrickContents.
-	uint32 BricksPerDWordLog2;
-
 	// Initializes the derived constants from the properties they are derived from.
 	void ComputeDerivedConstants();
-
-	// Calculates the index in BrickContents, the shift, and the mask for the brick at some coordinates. The mask is in terms of the bits that have been shifted so the LSB is in bit 0.
-	void CalcIndexShiftMask(uint32 X,uint32 Y,uint32 Z,uint32& OutDWordIndex,uint32& OutShift,uint32& OutMask) const;
 
 	// Creates a chunk for the given coordinates.
 	void CreateChunk(const FInt3& Coordinates);

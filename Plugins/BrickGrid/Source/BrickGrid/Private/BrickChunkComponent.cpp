@@ -141,7 +141,7 @@ public:
 		// Precompute the packed tangent basis for each face direction.
 		FPackedNormal PackedFaceTangentX[6];
 		FPackedNormal PackedFaceTangentZ[6];
-		for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
+		for(uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
 		{
 			const FVector FaceTangentX(BrickVertices[FaceVertices[FaceIndex][2]] - BrickVertices[FaceVertices[FaceIndex][0]]);
 			const FVector FaceTangentZ = (FVector)FaceNormal[FaceIndex];
@@ -163,18 +163,18 @@ public:
 		const FInt3 MinBrickCoordinates = Component->Coordinates << Grid->BricksPerChunkLog2;
 		const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerChunk + FInt3::Scalar(1);
 		const int32 EmptyMaterialIndex = Grid->EmptyMaterialIndex;
-		for (int32 Z = MinBrickCoordinates.Z; Z < MaxBrickCoordinatesPlus1.Z; ++Z)
+		for(int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
 		{
-			for (int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
+			for(int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
 			{
-				for (int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
+				for(int32 Z = MinBrickCoordinates.Z; Z < MaxBrickCoordinatesPlus1.Z; ++Z)
 				{
 					// Only draw faces of bricks that aren't empty.
 					const FInt3 BrickCoordinates(X,Y,Z);
 					const uint32 BrickMaterial = Grid->GetBrick(BrickCoordinates);
 					if (BrickMaterial != EmptyMaterialIndex)
 					{
-						for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
+						for(uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
 						{
 							// Only draw faces that face empty bricks.
 							const FInt3 FrontBrickXYZ = BrickCoordinates + FaceNormal[FaceIndex];
@@ -182,7 +182,7 @@ public:
 							{
 								// Write the vertices for the brick face.
 								const uint32 BaseFaceVertexIndex = VertexBuffer.Vertices.Num();
-								for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)
+								for(uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)
 								{
 									const FInt3 Position = FInt3(X,Y,Z) + BrickVertices[FaceVertices[FaceIndex][FaceVertexIndex]] - MinBrickCoordinates;
 									new(VertexBuffer.Vertices) FBrickVertex(Position,FaceUVs[FaceVertexIndex],PackedFaceTangentX[FaceIndex],PackedFaceTangentZ[FaceIndex]);
@@ -203,7 +203,7 @@ public:
 		}
 
 		// Create mesh elements for each batch.
-		for (int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
+		for(int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
 		{
 			if (MaterialBatches[MaterialIndex].Indices.Num() > 0)
 			{
@@ -218,7 +218,7 @@ public:
 		}
 
 		// Copy the materials.
-		for (int32 MaterialIndex = 0; MaterialIndex < Component->GetNumMaterials(); ++MaterialIndex)
+		for(int32 MaterialIndex = 0; MaterialIndex < Component->GetNumMaterials(); ++MaterialIndex)
 		{
 			UMaterialInterface* Material = Component->GetMaterial(MaterialIndex);
 			if (Material == NULL)
@@ -257,7 +257,7 @@ public:
 			);
 
 		// Draw the mesh elements.
-		for (int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
+		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
 			PDI->DrawMesh(GetMeshBatch(ElementIndex, &WireframeMaterialInstance));
 		}
@@ -265,7 +265,7 @@ public:
 
 	virtual void DrawStaticElements(FStaticPrimitiveDrawInterface* PDI) OVERRIDE
 	{
-		for (int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
+		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
 			PDI->DrawMesh(GetMeshBatch(ElementIndex,false),0,FLT_MAX);
 		}
@@ -389,11 +389,11 @@ void UBrickChunkComponent::UpdateCollisionBody()
 	const FInt3 MinBrickCoordinates = Coordinates << Grid->BricksPerChunkLog2;
 	const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerChunk + FInt3::Scalar(1);
 	const int32 EmptyMaterialIndex = Grid->EmptyMaterialIndex;
-	for (int32 Z = MinBrickCoordinates.Z; Z < MaxBrickCoordinatesPlus1.Z; ++Z)
+	for(int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
 	{
-		for (int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
+		for(int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
 		{
-			for (int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
+			for(int32 Z = MinBrickCoordinates.Z; Z < MaxBrickCoordinatesPlus1.Z; ++Z)
 			{
 				// Only create collision boxes for bricks that aren't empty.
 				const FInt3 BrickCoordinates(X,Y,Z);
