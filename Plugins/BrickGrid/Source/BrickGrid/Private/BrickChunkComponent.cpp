@@ -155,14 +155,14 @@ public:
 			TArray<int32> Indices;
 		};
 		TArray<FMaterialBatch> MaterialBatches;
-		MaterialBatches.Init(FMaterialBatch(),Component->Grid->Materials.Num());
+		MaterialBatches.Init(FMaterialBatch(),Component->Grid->Parameters.Materials.Num());
 
 		// Iterate over each brick in the chunk.
 		const UBrickGridComponent* Grid = Component->Grid;
 		const FInt3 BricksPerChunk = Grid->BricksPerChunk;
-		const FInt3 MinBrickCoordinates = Component->Coordinates << Grid->BricksPerChunkLog2;
+		const FInt3 MinBrickCoordinates = Component->Coordinates << Grid->Parameters.BricksPerChunkLog2;
 		const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerChunk + FInt3::Scalar(1);
-		const int32 EmptyMaterialIndex = Grid->EmptyMaterialIndex;
+		const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
 		for(int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
 		{
 			for(int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
@@ -353,13 +353,13 @@ FPrimitiveSceneProxy* UBrickChunkComponent::CreateSceneProxy()
 
 int32 UBrickChunkComponent::GetNumMaterials() const
 {
-	return Grid->Materials.Num();
+	return Grid->Parameters.Materials.Num();
 }
 
 class UMaterialInterface* UBrickChunkComponent::GetMaterial(int32 ElementIndex) const
 {
-	return Grid != NULL && ElementIndex >= 0 && ElementIndex < Grid->Materials.Num() 
-		? Grid->Materials[ElementIndex].SurfaceMaterial
+	return Grid != NULL && ElementIndex >= 0 && ElementIndex < Grid->Parameters.Materials.Num() 
+		? Grid->Parameters.Materials[ElementIndex].SurfaceMaterial
 		: NULL;
 }
 
@@ -386,9 +386,9 @@ void UBrickChunkComponent::UpdateCollisionBody()
 
 	// Iterate over each brick in the chunk.
 	const FInt3 BricksPerChunk = Grid->BricksPerChunk;
-	const FInt3 MinBrickCoordinates = Coordinates << Grid->BricksPerChunkLog2;
+	const FInt3 MinBrickCoordinates = Coordinates << Grid->Parameters.BricksPerChunkLog2;
 	const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerChunk + FInt3::Scalar(1);
-	const int32 EmptyMaterialIndex = Grid->EmptyMaterialIndex;
+	const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
 	for(int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
 	{
 		for(int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)

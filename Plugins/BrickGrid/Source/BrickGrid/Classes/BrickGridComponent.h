@@ -136,23 +136,11 @@ struct FBrickRegion
 	TArray<uint8> BrickContents;
 };
 
-// The type of OnInitChunk delegates.
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBrickGrid_InitRegion,
-	class UBrickGridComponent*,BrickGrid,
-	const FInt3&,RegionCoordinates
-	);
-
-/** A 3D grid of brick chunks. */
-UCLASS(hidecategories=(Object,LOD, Physics), editinlinenew, meta=(BlueprintSpawnableComponent), ClassGroup=Rendering)
-class UBrickGridComponent : public USceneComponent
+/** The parameters for a BrickGridComponent. */
+USTRUCT(BlueprintType)
+struct FBrickGridParameters
 {
-	GENERATED_UCLASS_BODY()
-
-public:
-
-	// The distance from the camera beyond which bricks may no longer be drawn.
-	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = View)
-	float MaxDrawDistance;
+	GENERATED_USTRUCT_BODY()
 
 	// The materials to render for each brick material.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Materials)
@@ -182,9 +170,23 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
 	FInt3 MaxRegionCoordinates;
 
-	// A delegate that is called when a new chunk is created.
-	UPROPERTY(BlueprintAssignable, Category = Regions)
-	FBrickGrid_InitRegion OnInitRegion;
+	FBrickGridParameters();
+};
+
+// The type of OnInitChunk delegates.
+DECLARE_DYNAMIC_DELEGATE_OneParam(FBrickGrid_InitRegion,FInt3,RegionCoordinates);
+
+/** A 3D grid of brick chunks. */
+UCLASS(hidecategories=(Object,LOD, Physics), editinlinenew, meta=(BlueprintSpawnableComponent), ClassGroup=Rendering)
+class UBrickGridComponent : public USceneComponent
+{
+	GENERATED_UCLASS_BODY()
+
+public:
+
+	// Initializes the grid with the given parameters.
+	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
+	void Init(const FBrickGridParameters& Parameters);
 
 	// Reads the brick at the given coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
@@ -196,27 +198,32 @@ public:
 
 	// Updates the visible chunks for a given view position.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API void UpdateVisibleChunks(const FVector& WorldViewPosition,int32 MaxRegionsToCreate);
+	BRICKGRID_API void UpdateVisibleChunks(const FVector& WorldViewPosition,float MaxDrawDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion InitRegion);
 
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Transient,Category = Chunks)
+	// The parameters for the grid.
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
+	FBrickGridParameters Parameters;
+
+	// Properties derived from the grid parameters.
+
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FInt3 BricksPerChunk;
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Transient,Category = Regions)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FInt3 ChunksPerRegion;
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Transient,Category = Regions)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FInt3 BricksPerRegionLog2;
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Transient,Category = Regions)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FInt3 BricksPerRegion;
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Transient,Category = Bricks)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FInt3 MinBrickCoordinates;
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Transient,Category = Bricks)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FInt3 MaxBrickCoordinates;
 
 	// USceneComponent interface.
 	virtual FBoxSphereBounds CalcBounds(const FTransform & LocalToWorld) const OVERRIDE;
+	// UActorComponent interface.
+	virtual void OnUnregister() OVERRIDE;
 	// UObject interface
-	#if WITH_EDITOR
-		virtual void PostEditChangeProperty( struct FPropertyChangedEvent& PropertyChangedEvent) OVERRIDE;
-	#endif
 	virtual void PostLoad() OVERRIDE;
 
 private:
@@ -240,11 +247,11 @@ private:
 	void CreateChunk(const FInt3& Coordinates);
 
 	// Creates a region for the given coordinates.
-	void CreateRegion(const FInt3& Coordinates);
+	void CreateRegion(const FInt3& Coordinates,FBrickGrid_InitRegion OnInitRegion);
 
 	inline FInt3 BrickToChunkCoordinates(const FInt3& BrickCoordinates) const
 	{
-		return SignedShiftRight(BrickCoordinates,BricksPerChunkLog2);
+		return SignedShiftRight(BrickCoordinates,Parameters.BricksPerChunkLog2);
 	}
 	inline FInt3 BrickToRegionCoordinates(const FInt3& BrickCoordinates) const
 	{

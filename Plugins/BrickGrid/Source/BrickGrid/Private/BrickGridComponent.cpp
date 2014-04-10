@@ -4,6 +4,37 @@
 #include "BrickChunkComponent.h"
 #include "BrickGridComponent.h"
 
+void UBrickGridComponent::Init(const FBrickGridParameters& InParameters)
+{
+	Parameters = InParameters;
+
+	// Validate the empty material index.
+	Parameters.EmptyMaterialIndex = FMath::Clamp<int32>(Parameters.EmptyMaterialIndex, 0, Parameters.Materials.Num() - 1);
+
+	// Don't allow fractional chunks/region.
+	Parameters.ChunksPerRegionLog2 = Max(Parameters.ChunksPerRegionLog2, FInt3::Scalar(0));
+
+	// Limit each chunk to 128x128x128 bricks, which is the largest power of 2 size that can be rendered using 8-bit relative vertex positions.
+	Parameters.BricksPerChunkLog2 = Clamp(Parameters.BricksPerChunkLog2, FInt3::Scalar(0), FInt3::Scalar(7));
+
+	// Derive the chunk and region sizes from the log2 inputs.
+	BricksPerRegionLog2 = Parameters.BricksPerChunkLog2 + Parameters.ChunksPerRegionLog2;
+	BricksPerChunk = Exp2(Parameters.BricksPerChunkLog2);
+	ChunksPerRegion = Exp2(Parameters.ChunksPerRegionLog2);
+	BricksPerRegion = Exp2(BricksPerRegionLog2);
+
+	// Clamp the min/max region coordinates to keep brick coordinates within 32-bit signed integers.
+	Parameters.MinRegionCoordinates = Max(Parameters.MinRegionCoordinates, FInt3::Scalar(INT_MIN) / BricksPerRegion);
+	Parameters.MaxRegionCoordinates = Min(Parameters.MaxRegionCoordinates, (FInt3::Scalar(INT_MAX) - BricksPerRegion + FInt3::Scalar(1)) / BricksPerRegion);
+	MinBrickCoordinates = Parameters.MinRegionCoordinates * BricksPerRegion;
+	MaxBrickCoordinates = Parameters.MaxRegionCoordinates * BricksPerRegion + BricksPerRegion - FInt3::Scalar(1);
+
+	// Reset the regions and reregister the component (which destroys the visible chunks).
+	Regions.Empty();
+	RegionCoordinatesToIndex.Empty();
+	ReregisterComponent();
+}
+
 int32 UBrickGridComponent::GetBrick(const FInt3& BrickCoordinates) const
 {
 	if(All(BrickCoordinates >= MinBrickCoordinates) && All(BrickCoordinates <= MaxBrickCoordinates))
@@ -19,12 +50,12 @@ int32 UBrickGridComponent::GetBrick(const FInt3& BrickCoordinates) const
 			return Region.BrickContents[BrickIndex];
 		}
 	}
-	return EmptyMaterialIndex;
+	return Parameters.EmptyMaterialIndex;
 }
 
 bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 MaterialIndex)
 {
-	if(All(BrickCoordinates >= MinBrickCoordinates) && All(BrickCoordinates <= MaxBrickCoordinates) && MaterialIndex < Materials.Num())
+	if (All(BrickCoordinates >= MinBrickCoordinates) && All(BrickCoordinates <= MaxBrickCoordinates) && MaterialIndex < Parameters.Materials.Num())
 	{
 		const FInt3 RegionCoordinates = BrickToRegionCoordinates(BrickCoordinates);
 		const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
@@ -48,10 +79,10 @@ bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 Material
 	return false;
 }
 
-void UBrickGridComponent::UpdateVisibleChunks(const FVector& WorldViewPosition,int32 MaxRegionsToCreate)
+void UBrickGridComponent::UpdateVisibleChunks(const FVector& WorldViewPosition,float MaxDrawDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion OnInitRegion)
 {
 	const FVector LocalViewPosition = GetComponenTransform().InverseTransformPosition(WorldViewPosition);
-	const float LocalMaxDrawDistance = MaxDrawDistance / GetComponenTransform().GetScale3D().GetMin();
+	const float LocalMaxDrawDistance = FMath::Max(0.0f,MaxDrawDistance / GetComponenTransform().GetScale3D().GetMin());
 	const FVector ChunkCenterOffset = FVector(BricksPerChunk.X,BricksPerChunk.Y,BricksPerChunk.Z) / 2.0f;
 	const float LocalChunkRadius = ChunkCenterOffset.Size();
 
@@ -69,11 +100,11 @@ void UBrickGridComponent::UpdateVisibleChunks(const FVector& WorldViewPosition,i
 				if(!Chunk)
 				{
 					// Ensure that a region is initialized before any chunks within it.
-					const FInt3 RegionCoordinates = SignedShiftRight(ChunkCoordinates,ChunksPerRegionLog2);
+					const FInt3 RegionCoordinates = SignedShiftRight(ChunkCoordinates,Parameters.ChunksPerRegionLog2);
 					const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
 					if(!RegionIndex)
 					{
-						CreateRegion(RegionCoordinates);
+						CreateRegion(RegionCoordinates,OnInitRegion);
 					}
 					CreateChunk(ChunkCoordinates);
 				}
@@ -85,7 +116,7 @@ void UBrickGridComponent::UpdateVisibleChunks(const FVector& WorldViewPosition,i
 void UBrickGridComponent::CreateChunk(const FInt3& Coordinates)
 {
 	// Initialize a new chunk component.
-	UBrickChunkComponent* Chunk = ConstructObject<UBrickChunkComponent>(ChunkClass,GetOwner());
+	UBrickChunkComponent* Chunk = ConstructObject<UBrickChunkComponent>(Parameters.ChunkClass, GetOwner());
 	Chunk->Grid = this;
 	Chunk->Coordinates = Coordinates;
 
@@ -99,20 +130,20 @@ void UBrickGridComponent::CreateChunk(const FInt3& Coordinates)
 	VisibleChunks.Add(Chunk);
 }
 
-void UBrickGridComponent::CreateRegion(const FInt3& Coordinates)
+void UBrickGridComponent::CreateRegion(const FInt3& Coordinates,FBrickGrid_InitRegion InitRegion)
 {
 	const int32 RegionIndex = Regions.Num();
 	FBrickRegion& Region = *new(Regions) FBrickRegion;
 	Region.Coordinates = Coordinates;
 
 	// Initialize the region's bricks to the empty material.
-	Region.BrickContents.Init(EmptyMaterialIndex,1 << (BricksPerRegionLog2.X + BricksPerRegionLog2.Y + BricksPerRegionLog2.Z));
+	Region.BrickContents.Init(Parameters.EmptyMaterialIndex, 1 << (BricksPerRegionLog2.X + BricksPerRegionLog2.Y + BricksPerRegionLog2.Z));
 
 	// Add the region to the coordinate map.
 	RegionCoordinatesToIndex.Add(Coordinates,RegionIndex);
 
 	// Call the InitRegion delegate for the new region.
-	OnInitRegion.Broadcast(this,Coordinates);
+	InitRegion.Execute(Coordinates);
 }
 
 FBoxSphereBounds UBrickGridComponent::CalcBounds(const FTransform & LocalToWorld) const
@@ -121,15 +152,15 @@ FBoxSphereBounds UBrickGridComponent::CalcBounds(const FTransform & LocalToWorld
 	return FBoxSphereBounds(FVector(0,0,0),FVector(1,1,1) * HALF_WORLD_MAX,FMath::Sqrt(3.0f * HALF_WORLD_MAX));
 }
 
-void UBrickGridComponent::ComputeDerivedConstants()
+FBrickGridParameters::FBrickGridParameters()
+: EmptyMaterialIndex(0)
+, BricksPerChunkLog2(5,5,5)
+, ChunksPerRegionLog2(0,0,0)
+, MinRegionCoordinates(-1024,-1024,0)
+, MaxRegionCoordinates(+1024,+1024,0)
+, ChunkClass(UBrickChunkComponent::StaticClass())
 {
-	// Derive the chunk and region sizes from the log2 inputs.
-	BricksPerRegionLog2 = BricksPerChunkLog2 + ChunksPerRegionLog2;
-	BricksPerChunk = Exp2(BricksPerChunkLog2);
-	ChunksPerRegion = Exp2(ChunksPerRegionLog2);
-	BricksPerRegion = Exp2(BricksPerRegionLog2);
-	MinBrickCoordinates = MinRegionCoordinates * BricksPerRegion;
-	MaxBrickCoordinates = MaxRegionCoordinates * BricksPerRegion + BricksPerRegion - FInt3::Scalar(1);
+	Materials.Add(FBrickMaterial());
 }
 
 UBrickGridComponent::UBrickGridComponent(const FPostConstructInitializeProperties& PCIP)
@@ -137,70 +168,30 @@ UBrickGridComponent::UBrickGridComponent(const FPostConstructInitializePropertie
 {
 	PrimaryComponentTick.bStartWithTickEnabled =true;
 
-	BricksPerChunkLog2 = FInt3::Scalar(4);
-	ChunksPerRegionLog2 = FInt3::Scalar(0);
-	MinRegionCoordinates = FInt3(-1024,-1024,0);
-	MaxRegionCoordinates = FInt3(1024,1024,0);
-
-	Materials.Add(FBrickMaterial());
-	EmptyMaterialIndex = 0;
-
-	MaxDrawDistance = 5000.0f;
-
-	ChunkClass = UBrickChunkComponent::StaticClass();
-
-	// Update the derived constants.
-	ComputeDerivedConstants();
+	Init(Parameters);
 }
-
-#if WITH_EDITOR
-	void UBrickGridComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-	{
-		if(PropertyChangedEvent.Property != NULL)
-		{
-			const FName PropertyName = PropertyChangedEvent.Property->GetFName();
-			if(	PropertyName == FName(TEXT("BricksPerChunkLog2"))
-			||	PropertyName == FName(TEXT("MaxRegionCoordinates"))
-			||	PropertyName == FName(TEXT("ChunksPerRegionLog2"))
-			||	PropertyName == FName(TEXT("MinRegionCoordinates"))
-			||	PropertyName == FName(TEXT("EmptyMaterialIndex"))
-			||	PropertyName == FName(TEXT("ChunkDrawRadius")))
-			{
-				// Don't allow fractional chunks/region.
-				ChunksPerRegionLog2 = Max(ChunksPerRegionLog2, FInt3::Scalar(0));
-
-				// Limit each chunk to 128x128x128 bricks, which is the largest power of 2 size that can be rendered using 8-bit relative vertex positions.
-				BricksPerChunkLog2 = Clamp(BricksPerChunkLog2, FInt3::Scalar(0), FInt3::Scalar(7));
-
-				// Clamp the min/max region coordinates to keep brick coordinates within 32-bit signed integers.
-				MinRegionCoordinates = Max(MinRegionCoordinates, FInt3::Scalar(INT_MIN) / BricksPerRegion);
-				MaxRegionCoordinates = Max(MaxRegionCoordinates, (FInt3::Scalar(INT_MAX) - BricksPerRegion + FInt3::Scalar(1)) / BricksPerRegion);
-
-				// Validate the empty material index.
-				EmptyMaterialIndex = FMath::Clamp<int32>(EmptyMaterialIndex, 0, Materials.Num() - 1);
-
-				// Don't allow negative draw radius.
-				MaxDrawDistance = FMath::Max(0.0f, MaxDrawDistance);
-
-				// Update the derived constants.
-				ComputeDerivedConstants();
-			}
-		}
-
-		Super::PostEditChangeProperty(PropertyChangedEvent);
-	}
-#endif
 
 void UBrickGridComponent::PostLoad()
 {
 	Super::PostLoad();
-
-	// Update the derived constants.
-	ComputeDerivedConstants();
 
 	// Recreate the region coordinate to index map, which isn't serialized.
 	for(auto RegionIt = Regions.CreateConstIterator();RegionIt;++RegionIt)
 	{
 		RegionCoordinatesToIndex.Add(RegionIt->Coordinates,RegionIt.GetIndex());
 	}
+}
+
+void UBrickGridComponent::OnUnregister()
+{
+	for(auto ChunkIt = VisibleChunks.CreateConstIterator();ChunkIt;++ChunkIt)
+	{
+		UBrickChunkComponent* Chunk = *ChunkIt;
+		Chunk->DetachFromParent();
+		Chunk->DestroyComponent();
+	}
+	VisibleChunks.Empty();
+	ChunkCoordinatesToComponent.Empty();
+
+	Super::OnUnregister();
 }
