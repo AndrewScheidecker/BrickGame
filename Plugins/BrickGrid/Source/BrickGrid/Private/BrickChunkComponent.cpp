@@ -259,7 +259,7 @@ public:
 		// Draw the mesh elements.
 		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
-			PDI->DrawMesh(GetMeshBatch(ElementIndex, &WireframeMaterialInstance));
+			PDI->DrawMesh(GetMeshBatch(ElementIndex, View->Family->EngineShowFlags.Wireframe ? &WireframeMaterialInstance : NULL));
 		}
 	}
 
@@ -267,7 +267,7 @@ public:
 	{
 		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
-			PDI->DrawMesh(GetMeshBatch(ElementIndex,false),0,FLT_MAX);
+			PDI->DrawMesh(GetMeshBatch(ElementIndex,NULL),0,FLT_MAX);
 		}
 	}
 
