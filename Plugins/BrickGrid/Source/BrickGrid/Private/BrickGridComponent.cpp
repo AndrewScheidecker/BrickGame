@@ -55,6 +55,20 @@ int32 UBrickGridComponent::GetBrick(const FInt3& BrickCoordinates) const
 
 bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 MaterialIndex)
 {
+	if(SetBrickWithoutInvalidatingComponents(BrickCoordinates,MaterialIndex))
+	{
+		// Mark primitive components for chunks containing faces of this brick.
+		const FInt3 MinChunkCoordinates = BrickToChunkCoordinates(BrickCoordinates - FInt3::Scalar(1));
+		const FInt3 MaxChunkCoordinates = BrickToChunkCoordinates(BrickCoordinates + FInt3::Scalar(1));
+		InvalidateChunkComponents(MinChunkCoordinates,MaxChunkCoordinates);
+
+		return true;
+	}
+	return false;
+}
+
+bool UBrickGridComponent::SetBrickWithoutInvalidatingComponents(const FInt3& BrickCoordinates, int32 MaterialIndex)
+{
 	if (All(BrickCoordinates >= MinBrickCoordinates) && All(BrickCoordinates <= MaxBrickCoordinates) && MaterialIndex < Parameters.Materials.Num())
 	{
 		const FInt3 RegionCoordinates = BrickToRegionCoordinates(BrickCoordinates);
@@ -67,16 +81,28 @@ bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 Material
 			FBrickRegion& Region = Regions[*RegionIndex];
 			Region.BrickContents[BrickIndex] = MaterialIndex;
 
-			UBrickChunkComponent* Component = ChunkCoordinatesToComponent.FindRef(BrickToChunkCoordinates(BrickCoordinates));
-			if(Component)
-			{
-				Component->MarkRenderStateDirty();
-			}
-
 			return true;
 		}
 	}
 	return false;
+}
+
+void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinChunkCoordinates,const FInt3& MaxChunkCoordinates)
+{
+	for(int32 ChunkX = MinChunkCoordinates.X;ChunkX <= MaxChunkCoordinates.X;++ChunkX)
+	{
+		for(int32 ChunkY = MinChunkCoordinates.Y;ChunkY <= MaxChunkCoordinates.Y;++ChunkY)
+		{
+			for(int32 ChunkZ = MinChunkCoordinates.Z;ChunkZ <= MaxChunkCoordinates.Z;++ChunkZ)
+			{
+				UBrickChunkComponent* Component = ChunkCoordinatesToComponent.FindRef(FInt3(ChunkX,ChunkY,ChunkZ));
+				if(Component)
+				{
+					Component->MarkRenderStateDirty();
+				}
+			}
+		}
+	}
 }
 
 void UBrickGridComponent::UpdateVisibleChunks(const FVector& WorldViewPosition,float MaxDrawDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion OnInitRegion)

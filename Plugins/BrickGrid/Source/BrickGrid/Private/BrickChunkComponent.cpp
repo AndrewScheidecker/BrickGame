@@ -5,27 +5,12 @@
 #include "BrickGridComponent.h"
 
 // Maps brick corner indices to 3D coordinates.
-static const FInt3 BrickVertices[8] =
+static FInt3 GetCornerVertexOffset(uint8 BrickVertexIndex)
 {
-	FInt3(0, 0, 0),
-	FInt3(0, 0, 1),
-	FInt3(0, 1, 0),
-	FInt3(0, 1, 1),
-	FInt3(1, 0, 0),
-	FInt3(1, 0, 1),
-	FInt3(1, 1, 0),
-	FInt3(1, 1, 1)
-};
-// Maps face vertex indices to UV coordinates.
-static const FInt3 FaceUVs[4] =
-{
-	FInt3(0, 255, 0),
-	FInt3(0, 0, 0),
-	FInt3(255, 0, 0),
-	FInt3(255, 255, 0)
-};
+	return (FInt3::Scalar(BrickVertexIndex) >> FInt3(2,1,0)) & FInt3::Scalar(1);
+}
 // Maps face index and face vertex index to brick corner indices.
-static const uint32 FaceVertices[6][4] =
+static const uint8 FaceVertices[6][4] =
 {
 	{ 2, 3, 1, 0 },		// -X
 	{ 4, 5, 7, 6 },		// +X
@@ -35,7 +20,7 @@ static const uint32 FaceVertices[6][4] =
 	{ 1, 3, 7, 5 }		// +Z
 };
 // Maps face index to normal.
-static const FInt3 FaceNormal[6] =
+static const FInt3 FaceNormals[6] =
 {
 	FInt3(-1, 0, 0),
 	FInt3(+1, 0, 0),
@@ -46,28 +31,13 @@ static const FInt3 FaceNormal[6] =
 };
 
 /**	An element of the vertex buffer given to the GPU by the CPU brick tessellator.
-	8-bit coordinates are used for efficiency, although some space is lost due to the limited vertex element types exposed by the UE4 RHI. */
+	8-bit coordinates are used for efficiency. */
 struct FBrickVertex
 {
 	uint8 X;
 	uint8 Y;
 	uint8 Z;
 	uint8 Padding0;
-	uint8 U;
-	uint8 V;
-	uint8 Padding1;
-	uint8 Padding2;
-	FPackedNormal TangentX;
-	FPackedNormal TangentZ;
-	FBrickVertex(const FInt3& Position, const FInt3& UV, const FVector& InTangentX, const FVector& InTangentZ)
-	: X(Position.X)
-	, Y(Position.Y)
-	, Z(Position.Z)
-	, U(UV.X)
-	, V(UV.Y)
-	, TangentX(FVector(InTangentX))
-	, TangentZ(FVector(InTangentZ))
-	{}
 };
 
 /** Vertex Buffer */
@@ -79,7 +49,7 @@ public:
 	{
 		if (Vertices.Num() > 0)
 		{
-			VertexBufferRHI = RHICreateVertexBuffer(Vertices.Num() * sizeof(FBrickVertex), NULL, BUF_Static);
+			VertexBufferRHI = RHICreateVertexBuffer(Vertices.Num() * sizeof(FBrickVertex), NULL, BUF_Dynamic);
 			// Copy the vertex data into the vertex buffer.
 			void* VertexBufferData = RHILockVertexBuffer(VertexBufferRHI, 0, Vertices.Num() * sizeof(FBrickVertex), RLM_WriteOnly);
 			FMemory::Memcpy(VertexBufferData, Vertices.GetTypedData(), Vertices.Num() * sizeof(FBrickVertex));
@@ -92,32 +62,58 @@ public:
 class FBrickChunkIndexBuffer : public FIndexBuffer 
 {
 public:
-	TArray<int32> Indices;
+	TArray<int16> Indices;
 	virtual void InitRHI()
 	{
 		if (Indices.Num() > 0)
 		{
-			IndexBufferRHI = RHICreateIndexBuffer(sizeof(int32), Indices.Num() * sizeof(int32), NULL, BUF_Static);
+			IndexBufferRHI = RHICreateIndexBuffer(sizeof(int16), Indices.Num() * sizeof(int16), NULL, BUF_Static);
 			// Write the indices to the index buffer.
-			void* Buffer = RHILockIndexBuffer(IndexBufferRHI, 0, Indices.Num() * sizeof(int32), RLM_WriteOnly);
-			FMemory::Memcpy(Buffer, Indices.GetTypedData(), Indices.Num() * sizeof(int32));
+			void* Buffer = RHILockIndexBuffer(IndexBufferRHI, 0, Indices.Num() * sizeof(int16), RLM_WriteOnly);
+			FMemory::Memcpy(Buffer, Indices.GetTypedData(), Indices.Num() * sizeof(int16));
 			RHIUnlockIndexBuffer(IndexBufferRHI);
 		}
 	}
 };
 
+/** Tangent Buffer */
+class FBrickChunkTangentBuffer : public FVertexBuffer
+{
+public:
+	TArray<FPackedNormal> Tangents;
+	virtual void InitRHI()
+	{
+		if (Tangents.Num() > 0)
+		{
+			VertexBufferRHI = RHICreateVertexBuffer(Tangents.Num() * sizeof(FPackedNormal), NULL, BUF_Dynamic);
+			// Copy the vertex data into the vertex buffer.
+			void* VertexBufferData = RHILockVertexBuffer(VertexBufferRHI, 0, Tangents.Num() * sizeof(FPackedNormal), RLM_WriteOnly);
+			FMemory::Memcpy(VertexBufferData, Tangents.GetTypedData(), Tangents.Num() * sizeof(FPackedNormal));
+			RHIUnlockVertexBuffer(VertexBufferRHI);
+		}
+	}
+};
 /** Vertex Factory */
 class FBrickChunkVertexFactory : public FLocalVertexFactory
 {
 public:
-	FBrickChunkVertexFactory(const FBrickChunkVertexBuffer& VertexBuffer)
+
+	void Init(const FBrickChunkVertexBuffer& VertexBuffer,uint32 FaceIndex)
 	{
+		const FVector UnprojectedTangentX(+1,-1,0);
+		const FVector UnprojectedTangentY(-1,-1,-1);
+		const FVector FaceNormal = FaceNormals[FaceIndex];
+		const FVector ProjectedFaceTangentX = (UnprojectedTangentX - FaceNormal * (UnprojectedTangentX | FaceNormal)).SafeNormal();
+		TangentXBuffer.Tangents.Add(FPackedNormal(ProjectedFaceTangentX));
+		TangentZBuffer.Tangents.Add(FPackedNormal(FVector4(FaceNormal, FMath::Sign(UnprojectedTangentY | (FaceNormal ^ ProjectedFaceTangentX)))));
+
 		// Initialize the vertex factory's stream components.
 		DataType NewData;
 		NewData.PositionComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N);
-		NewData.TextureCoordinates.Add(STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, U, VET_UByte4N));
-		NewData.TangentBasisComponents[0] = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, TangentX, VET_PackedNormal);
-		NewData.TangentBasisComponents[1] = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, TangentZ, VET_PackedNormal);
+		NewData.TextureCoordinates.Add(STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N));
+		// Use a stride of 0 to use the same TangentX/TangentZ for all faces using this vertex factory.
+		NewData.TangentBasisComponents[0] = FVertexStreamComponent(&TangentXBuffer,0,0,VET_PackedNormal);
+		NewData.TangentBasisComponents[1] = FVertexStreamComponent(&TangentZBuffer,0,0,VET_PackedNormal);
 		check(!IsInRenderingThread());
 		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
 			InitBrickChunkVertexFactory,
@@ -127,6 +123,24 @@ public:
 			VertexFactory->SetData(NewData);
 		});
 	}
+
+	virtual void InitResource()
+	{
+		TangentXBuffer.InitResource();
+		TangentZBuffer.InitResource();
+		FLocalVertexFactory::InitResource();
+	}
+	virtual void ReleaseResource()
+	{
+		TangentXBuffer.ReleaseResource();
+		TangentZBuffer.ReleaseResource();
+		FLocalVertexFactory::ReleaseResource();
+	}
+
+private:
+
+	FBrickChunkTangentBuffer TangentXBuffer;
+	FBrickChunkTangentBuffer TangentZBuffer;
 };
 
 /** Scene proxy */
@@ -135,24 +149,16 @@ class FBrickChunkSceneProxy : public FPrimitiveSceneProxy
 public:
 
 	FBrickChunkSceneProxy(UBrickChunkComponent* Component)
-		: FPrimitiveSceneProxy(Component)
-		, VertexFactory(VertexBuffer)
+	: FPrimitiveSceneProxy(Component)
 	{
-		// Precompute the packed tangent basis for each face direction.
-		FPackedNormal PackedFaceTangentX[6];
-		FPackedNormal PackedFaceTangentZ[6];
-		for(uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
-		{
-			const FVector FaceTangentX(BrickVertices[FaceVertices[FaceIndex][2]] - BrickVertices[FaceVertices[FaceIndex][0]]);
-			const FVector FaceTangentZ = (FVector)FaceNormal[FaceIndex];
-			PackedFaceTangentX[FaceIndex] = FaceTangentX;
-			PackedFaceTangentZ[FaceIndex] = FaceTangentZ;
-		}
-
 		// Batch the faces by material and direction.
+		struct FFaceBatch
+		{
+			TArray<int16> Indices;
+		};
 		struct FMaterialBatch
 		{
-			TArray<int32> Indices;
+			FFaceBatch FaceBatches[6];
 		};
 		TArray<FMaterialBatch> MaterialBatches;
 		MaterialBatches.Init(FMaterialBatch(),Component->Grid->Parameters.Materials.Num());
@@ -177,24 +183,30 @@ public:
 						for(uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
 						{
 							// Only draw faces that face empty bricks.
-							const FInt3 FrontBrickXYZ = BrickCoordinates + FaceNormal[FaceIndex];
+							const FInt3 FrontBrickXYZ = BrickCoordinates + FaceNormals[FaceIndex];
 							if (Grid->GetBrick(FrontBrickXYZ) == EmptyMaterialIndex)
 							{
 								// Write the vertices for the brick face.
-								const uint32 BaseFaceVertexIndex = VertexBuffer.Vertices.Num();
-								for(uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)
+								const int32 BaseFaceVertexIndex = VertexBuffer.Vertices.AddUninitialized(4);
+								FBrickVertex* FaceVertex = &VertexBuffer.Vertices[BaseFaceVertexIndex];
+								const FInt3 RelativeBrickCoordinates = BrickCoordinates - MinBrickCoordinates;
+								for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex, ++FaceVertex)
 								{
-									const FInt3 Position = FInt3(X,Y,Z) + BrickVertices[FaceVertices[FaceIndex][FaceVertexIndex]] - MinBrickCoordinates;
-									new(VertexBuffer.Vertices) FBrickVertex(Position,FaceUVs[FaceVertexIndex],PackedFaceTangentX[FaceIndex],PackedFaceTangentZ[FaceIndex]);
+									const FInt3 Position = RelativeBrickCoordinates + GetCornerVertexOffset(FaceVertices[FaceIndex][FaceVertexIndex]);
+									FaceVertex->X = Position.X;
+									FaceVertex->Y = Position.Y;
+									FaceVertex->Z = Position.Z;
 								}
 
 								// Write the indices for the brick face.
-								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 0);
-								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 1);
-								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 2);
-								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 0);
-								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 2);
-								MaterialBatches[BrickMaterial].Indices.Add(BaseFaceVertexIndex + 3);
+								FFaceBatch& FaceBatch = MaterialBatches[BrickMaterial].FaceBatches[FaceIndex];
+								int16* FaceVertexIndex = &FaceBatch.Indices[FaceBatch.Indices.AddUninitialized(6)];
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 0;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 1;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 2;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 0;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 2;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 3;
 							}
 						}
 					}
@@ -203,17 +215,31 @@ public:
 		}
 
 		// Create mesh elements for each batch.
+		int32 NumIndices = 0;
 		for(int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
 		{
-			if (MaterialBatches[MaterialIndex].Indices.Num() > 0)
+			for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 			{
-				FElement& Element = *new(Elements)FElement;
-				Element.FirstIndex = IndexBuffer.Indices.Num();
-				Element.NumPrimitives = MaterialBatches[MaterialIndex].Indices.Num() / 3;
-				Element.MaterialIndex = MaterialIndex;
+				NumIndices += MaterialBatches[MaterialIndex].FaceBatches[FaceIndex].Indices.Num();
+			}
+		}
+		IndexBuffer.Indices.Empty(NumIndices);
+		for(int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
+		{
+			for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
+			{
+				const FFaceBatch& FaceBatch = MaterialBatches[MaterialIndex].FaceBatches[FaceIndex];
+				if (FaceBatch.Indices.Num() > 0)
+				{
+					FElement& Element = *new(Elements)FElement;
+					Element.FirstIndex = IndexBuffer.Indices.Num();
+					Element.NumPrimitives = FaceBatch.Indices.Num() / 3;
+					Element.MaterialIndex = MaterialIndex;
+					Element.FaceIndex = FaceIndex;
 
-				// Append the batch's indices to the index buffer.
-				IndexBuffer.Indices.Append(MaterialBatches[MaterialIndex].Indices);
+					// Append the batch's indices to the index buffer.
+					IndexBuffer.Indices.Append(FaceBatch.Indices);
+				}
 			}
 		}
 
@@ -232,14 +258,21 @@ public:
 		// Enqueue initialization of render resource
 		BeginInitResource(&VertexBuffer);
 		BeginInitResource(&IndexBuffer);
-		BeginInitResource(&VertexFactory);
+		for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
+		{
+			VertexFactories[FaceIndex].Init(VertexBuffer,FaceIndex);
+			BeginInitResource(&VertexFactories[FaceIndex]);
+		}
 	}
 
 	virtual ~FBrickChunkSceneProxy()
 	{
 		VertexBuffer.ReleaseResource();
 		IndexBuffer.ReleaseResource();
-		VertexFactory.ReleaseResource();
+		for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
+		{
+			VertexFactories[FaceIndex].ReleaseResource();
+		}
 	}
 
 	virtual void OnTransformChanged() OVERRIDE
@@ -250,8 +283,8 @@ public:
 
 	virtual void DrawDynamicElements(FPrimitiveDrawInterface* PDI,const FSceneView* View) OVERRIDE
 	{
-		// Set up the wireframe material instance.
-		FColoredMaterialRenderProxy WireframeMaterialInstance(
+		// Set up the wireframe material Face.
+		FColoredMaterialRenderProxy WireframeMaterialFace(
 			WITH_EDITOR ? GEngine->WireframeMaterial->GetRenderProxy(IsSelected()) : NULL,
 			FLinearColor(0, 0.5f, 1.f)
 			);
@@ -259,7 +292,7 @@ public:
 		// Draw the mesh elements.
 		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
-			PDI->DrawMesh(GetMeshBatch(ElementIndex, View->Family->EngineShowFlags.Wireframe ? &WireframeMaterialInstance : NULL));
+			PDI->DrawMesh(GetMeshBatch(ElementIndex, View->Family->EngineShowFlags.Wireframe ? &WireframeMaterialFace : NULL));
 		}
 	}
 
@@ -294,13 +327,14 @@ private:
 
 	FBrickChunkVertexBuffer VertexBuffer;
 	FBrickChunkIndexBuffer IndexBuffer;
-	FBrickChunkVertexFactory VertexFactory;
+	FBrickChunkVertexFactory VertexFactories[6];
 
 	struct FElement
 	{
 		uint32 FirstIndex;
 		uint32 NumPrimitives;
 		uint32 MaterialIndex;
+		uint32 FaceIndex;
 	};
 	TArray<FElement> Elements;
 
@@ -309,13 +343,13 @@ private:
 
 	TUniformBufferRef<FPrimitiveUniformShaderParameters> PrimitiveUniformBuffer;
 
-	FMeshBatch GetMeshBatch(int32 ElementIndex,FMaterialRenderProxy* WireframeMaterialInstance)
+	FMeshBatch GetMeshBatch(int32 ElementIndex,FMaterialRenderProxy* WireframeMaterialFace)
 	{
 		const FElement& Element = Elements[ElementIndex];
 		FMeshBatch Mesh;
-		Mesh.bWireframe = WireframeMaterialInstance != NULL;
-		Mesh.VertexFactory = &VertexFactory;
-		Mesh.MaterialRenderProxy = WireframeMaterialInstance ? WireframeMaterialInstance : Materials[Element.MaterialIndex]->GetRenderProxy(IsSelected());
+		Mesh.bWireframe = WireframeMaterialFace != NULL;
+		Mesh.VertexFactory = &VertexFactories[Element.FaceIndex];
+		Mesh.MaterialRenderProxy = WireframeMaterialFace ? WireframeMaterialFace : Materials[Element.MaterialIndex]->GetRenderProxy(IsSelected());
 		Mesh.ReverseCulling = IsLocalToWorldDeterminantNegative();
 		Mesh.Type = PT_TriangleList;
 		Mesh.DepthPriorityGroup = SDPG_World;
@@ -404,7 +438,7 @@ void UBrickChunkComponent::UpdateCollisionBody()
 					bool HasEmptyNeighbor = false;
 					for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 					{
-						if(Grid->GetBrick(BrickCoordinates + FaceNormal[FaceIndex]) == EmptyMaterialIndex)
+						if(Grid->GetBrick(BrickCoordinates + FaceNormals[FaceIndex]) == EmptyMaterialIndex)
 						{
 							HasEmptyNeighbor = true;
 							break;
@@ -430,6 +464,6 @@ void UBrickChunkComponent::UpdateCollisionBody()
 		}
 	}
 
-	// Recreate the physics state, which includes an instance of the CollisionBodySetup.
+	// Recreate the physics state, which includes an Face of the CollisionBodySetup.
 	RecreatePhysicsState();
 }

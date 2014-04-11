@@ -71,6 +71,7 @@ struct FInt3
 	DEFINE_VECTOR_OPERATOR(/);
 	DEFINE_VECTOR_OPERATOR(&);
 	DEFINE_VECTOR_OPERATOR(<<);
+	DEFINE_VECTOR_OPERATOR(>>);
 	DEFINE_VECTOR_OPERATOR(<);
 	DEFINE_VECTOR_OPERATOR(<=);
 	DEFINE_VECTOR_OPERATOR(>);
@@ -196,6 +197,14 @@ public:
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API bool SetBrick(const FInt3& BrickCoordinates,int32 MaterialIndex);
 
+	// Writes the brick at the given coordinates without invalidating the chunk components.
+	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
+	BRICKGRID_API bool SetBrickWithoutInvalidatingComponents(const FInt3& BrickCoordinates,int32 MaterialIndex);
+
+	// Invalidates the chunk components for a range of brick coordinates.
+	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
+	BRICKGRID_API void InvalidateChunkComponents(const FInt3& MinChunkCoordinates,const FInt3& MaxChunkCoordinates);
+
 	// Updates the visible chunks for a given view position.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API void UpdateVisibleChunks(const FVector& WorldViewPosition,float MaxDrawDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion InitRegion);
@@ -218,6 +227,15 @@ public:
 	FInt3 MinBrickCoordinates;
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FInt3 MaxBrickCoordinates;
+
+	inline FInt3 BrickToChunkCoordinates(const FInt3& BrickCoordinates) const
+	{
+		return SignedShiftRight(BrickCoordinates,Parameters.BricksPerChunkLog2);
+	}
+	inline FInt3 BrickToRegionCoordinates(const FInt3& BrickCoordinates) const
+	{
+		return SignedShiftRight(BrickCoordinates,BricksPerRegionLog2);
+	}
 
 	// USceneComponent interface.
 	virtual FBoxSphereBounds CalcBounds(const FTransform & LocalToWorld) const OVERRIDE;
@@ -248,13 +266,4 @@ private:
 
 	// Creates a region for the given coordinates.
 	void CreateRegion(const FInt3& Coordinates,FBrickGrid_InitRegion OnInitRegion);
-
-	inline FInt3 BrickToChunkCoordinates(const FInt3& BrickCoordinates) const
-	{
-		return SignedShiftRight(BrickCoordinates,Parameters.BricksPerChunkLog2);
-	}
-	inline FInt3 BrickToRegionCoordinates(const FInt3& BrickCoordinates) const
-	{
-		return SignedShiftRight(BrickCoordinates,BricksPerRegionLog2);
-	}
 };
