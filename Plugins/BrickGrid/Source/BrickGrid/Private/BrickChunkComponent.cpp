@@ -100,7 +100,7 @@ public:
 
 	void Init(const FBrickChunkVertexBuffer& VertexBuffer,uint32 FaceIndex)
 	{
-		const FVector UnprojectedTangentX(+1,-1,0);
+		const FVector UnprojectedTangentX = FVector(+1,-1,0).SafeNormal();
 		const FVector UnprojectedTangentY(-1,-1,-1);
 		const FVector FaceNormal = FaceNormals[FaceIndex];
 		const FVector ProjectedFaceTangentX = (UnprojectedTangentX - FaceNormal * (UnprojectedTangentX | FaceNormal)).SafeNormal();
