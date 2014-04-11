@@ -27,12 +27,10 @@ public:
 	IConsoleObject* Registration;
 
 	// UObject interface.
-	virtual void PostLoad() OVERRIDE;
-	virtual void BeginDestroy() OVERRIDE;
+	virtual void OnRegister() OVERRIDE;
+	virtual void OnUnregister() OVERRIDE;
 
 private:
-
-	void RegisterCommand();
 
 	void Exec();
 };
