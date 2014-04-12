@@ -174,6 +174,17 @@ struct FBrickGridParameters
 	FBrickGridParameters();
 };
 
+/** Allows blueprint to extract a black-box representation of the brick grid's persistent data. */
+USTRUCT(BlueprintType)
+struct FBrickGridData
+{
+	GENERATED_USTRUCT_BODY()
+
+	// All regions of the grid.
+	UPROPERTY()
+	TArray<struct FBrickRegion> Regions;
+};
+
 // The type of OnInitChunk delegates.
 DECLARE_DYNAMIC_DELEGATE_OneParam(FBrickGrid_InitRegion,FInt3,RegionCoordinates);
 
@@ -188,6 +199,14 @@ public:
 	// Initializes the grid with the given parameters.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	void Init(const FBrickGridParameters& Parameters);
+
+	// Returns a copy of the grid's brick data.
+	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
+	BRICKGRID_API FBrickGridData GetData() const;
+
+	// Sets the grid's brick data.
+	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
+	BRICKGRID_API void SetData(const FBrickGridData& Data);
 
 	// Reads the brick at the given coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
@@ -240,6 +259,7 @@ public:
 	// USceneComponent interface.
 	virtual FBoxSphereBounds CalcBounds(const FTransform & LocalToWorld) const OVERRIDE;
 	// UActorComponent interface.
+	virtual void OnRegister() OVERRIDE;
 	virtual void OnUnregister() OVERRIDE;
 	// UObject interface
 	virtual void PostLoad() OVERRIDE;

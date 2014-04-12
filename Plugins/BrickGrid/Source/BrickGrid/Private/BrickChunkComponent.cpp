@@ -375,6 +375,7 @@ UBrickChunkComponent::UBrickChunkComponent( const FPostConstructInitializeProper
 	CastShadow = true;
 	bUseAsOccluder = true;
 	bCanEverAffectNavigation = true;	
+	bAutoRegister = false;
 
 	CollisionBodySetup = ConstructObject<UBodySetup>(UBodySetup::StaticClass(), this);
 	CollisionBodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;

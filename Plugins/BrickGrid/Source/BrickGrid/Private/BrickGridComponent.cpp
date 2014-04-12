@@ -30,9 +30,35 @@ void UBrickGridComponent::Init(const FBrickGridParameters& InParameters)
 	MaxBrickCoordinates = Parameters.MaxRegionCoordinates * BricksPerRegion + BricksPerRegion - FInt3::Scalar(1);
 
 	// Reset the regions and reregister the component (which destroys the visible chunks).
+	FComponentReregisterContext ReregisterContext(this);
 	Regions.Empty();
 	RegionCoordinatesToIndex.Empty();
-	ReregisterComponent();
+	for(auto ChunkIt = VisibleChunks.CreateConstIterator();ChunkIt;++ChunkIt)
+	{
+		UBrickChunkComponent* Chunk = *ChunkIt;
+		Chunk->DetachFromParent();
+		Chunk->DestroyComponent();
+	}
+	VisibleChunks.Empty();
+	ChunkCoordinatesToComponent.Empty();
+}
+
+FBrickGridData UBrickGridComponent::GetData() const
+{
+	FBrickGridData Result;
+	Result.Regions = Regions;
+	return Result;
+}
+
+void UBrickGridComponent::SetData(const FBrickGridData& Data)
+{
+	Init(Parameters);
+	Regions = Data.Regions;
+	// Recreate the region coordinate to index map.
+	for(auto RegionIt = Regions.CreateConstIterator();RegionIt;++RegionIt)
+	{
+		RegionCoordinatesToIndex.Add(RegionIt->Coordinates,RegionIt.GetIndex());
+	}
 }
 
 int32 UBrickGridComponent::GetBrick(const FInt3& BrickCoordinates) const
@@ -208,16 +234,24 @@ void UBrickGridComponent::PostLoad()
 	}
 }
 
-void UBrickGridComponent::OnUnregister()
+void UBrickGridComponent::OnRegister()
 {
+	Super::OnRegister();
+
 	for(auto ChunkIt = VisibleChunks.CreateConstIterator();ChunkIt;++ChunkIt)
 	{
 		UBrickChunkComponent* Chunk = *ChunkIt;
-		Chunk->DetachFromParent();
-		Chunk->DestroyComponent();
+		Chunk->RegisterComponent();
 	}
-	VisibleChunks.Empty();
-	ChunkCoordinatesToComponent.Empty();
+}
+
+void UBrickGridComponent::OnUnregister()
+{
+	for (auto ChunkIt = VisibleChunks.CreateConstIterator(); ChunkIt; ++ChunkIt)
+	{
+		UBrickChunkComponent* Chunk = *ChunkIt;
+		Chunk->UnregisterComponent();
+	}
 
 	Super::OnUnregister();
 }
