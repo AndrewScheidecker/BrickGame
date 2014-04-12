@@ -1,7 +1,8 @@
 // Copyright 2014, Andrew Scheidecker. All Rights Reserved. 
 
 #include "BrickGridPluginPrivatePCH.h"
-#include "BrickChunkComponent.h"
+#include "BrickRenderComponent.h"
+#include "BrickCollisionComponent.h"
 #include "BrickGridComponent.h"
 
 void UBrickGridComponent::Init(const FBrickGridParameters& InParameters)
@@ -29,18 +30,22 @@ void UBrickGridComponent::Init(const FBrickGridParameters& InParameters)
 	MinBrickCoordinates = Parameters.MinRegionCoordinates * BricksPerRegion;
 	MaxBrickCoordinates = Parameters.MaxRegionCoordinates * BricksPerRegion + BricksPerRegion - FInt3::Scalar(1);
 
-	// Reset the regions and reregister the component (which destroys the visible chunks).
+	// Reset the regions and reregister the component.
 	FComponentReregisterContext ReregisterContext(this);
 	Regions.Empty();
 	RegionCoordinatesToIndex.Empty();
-	for(auto ChunkIt = VisibleChunks.CreateConstIterator();ChunkIt;++ChunkIt)
+	for(auto ChunkIt = ChunkCoordinatesToRenderComponent.CreateConstIterator();ChunkIt;++ChunkIt)
 	{
-		UBrickChunkComponent* Chunk = *ChunkIt;
-		Chunk->DetachFromParent();
-		Chunk->DestroyComponent();
+		ChunkIt.Value()->DetachFromParent();
+		ChunkIt.Value()->DestroyComponent();
 	}
-	VisibleChunks.Empty();
-	ChunkCoordinatesToComponent.Empty();
+	for(auto ChunkIt = ChunkCoordinatesToCollisionComponent.CreateConstIterator();ChunkIt;++ChunkIt)
+	{
+		ChunkIt.Value()->DetachFromParent();
+		ChunkIt.Value()->DestroyComponent();
+	}
+	ChunkCoordinatesToRenderComponent.Empty();
+	ChunkCoordinatesToCollisionComponent.Empty();
 }
 
 FBrickGridData UBrickGridComponent::GetData() const
@@ -121,81 +126,139 @@ void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinChunkCoordin
 		{
 			for(int32 ChunkZ = MinChunkCoordinates.Z;ChunkZ <= MaxChunkCoordinates.Z;++ChunkZ)
 			{
-				UBrickChunkComponent* Component = ChunkCoordinatesToComponent.FindRef(FInt3(ChunkX,ChunkY,ChunkZ));
-				if(Component)
+				UBrickRenderComponent* RenderComponent = ChunkCoordinatesToRenderComponent.FindRef(FInt3(ChunkX,ChunkY,ChunkZ));
+				if(RenderComponent)
 				{
-					Component->MarkRenderStateDirty();
+					RenderComponent->MarkRenderStateDirty();
+				}
+				UBrickCollisionComponent* CollisionComponent = ChunkCoordinatesToCollisionComponent.FindRef(FInt3(ChunkX, ChunkY, ChunkZ));
+				if (CollisionComponent)
+				{
+					CollisionComponent->MarkRenderStateDirty();
 				}
 			}
 		}
 	}
 }
 
-void UBrickGridComponent::UpdateVisibleChunks(const FVector& WorldViewPosition,float MaxDrawDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion OnInitRegion)
+void UBrickGridComponent::UpdateVisibleChunks(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion OnInitRegion)
 {
 	const FVector LocalViewPosition = GetComponenTransform().InverseTransformPosition(WorldViewPosition);
 	const float LocalMaxDrawDistance = FMath::Max(0.0f,MaxDrawDistance / GetComponenTransform().GetScale3D().GetMin());
-	const FVector ChunkCenterOffset = FVector(BricksPerChunk.X,BricksPerChunk.Y,BricksPerChunk.Z) / 2.0f;
-	const float LocalChunkRadius = ChunkCenterOffset.Size();
+	const float LocalMaxCollisionDistance = FMath::Max(0.0f,MaxCollisionDistance / GetComponenTransform().GetScale3D().GetMin());
+	const float LocalMaxDrawAndCollisionDistance = FMath::Max(LocalMaxDrawDistance,LocalMaxCollisionDistance);
 
-	const FInt3 MinVisibleChunkCoordinates = BrickToChunkCoordinates(Max(MinBrickCoordinates, Floor(LocalViewPosition - FVector(LocalMaxDrawDistance))));
-	const FInt3 MaxVisibleChunkCoordinates = BrickToChunkCoordinates(Min(MaxBrickCoordinates, Ceil(LocalViewPosition + FVector(LocalMaxDrawDistance))));
-
-	for(int32 ChunkZ = MinVisibleChunkCoordinates.Z;ChunkZ <= MaxVisibleChunkCoordinates.Z;++ChunkZ)
+	// Initialize any regions that are closer to the viewer than the draw or collision distance.
+	// Include an additional ring of regions around what is being drawn or colliding so it has plenty of frames to spread initialization over before the data is needed.r
+	const FInt3 MinInitRegionCoordinates = BrickToRegionCoordinates(Max(MinBrickCoordinates,Floor(LocalViewPosition - FVector(LocalMaxDrawAndCollisionDistance)) - FInt3::Scalar(1)));
+	const FInt3 MaxInitRegionCoordinates = BrickToRegionCoordinates(Max(MinBrickCoordinates,Ceil(LocalViewPosition + FVector(LocalMaxDrawAndCollisionDistance)) + FInt3::Scalar(1)));
+	int32 NumInitializedRegions = 0;
+	for(int32 RegionZ = MinInitRegionCoordinates.Z;RegionZ <= MaxInitRegionCoordinates.Z && NumInitializedRegions < MaxRegionsToCreate;++RegionZ)
 	{
-		for(int32 ChunkY = MinVisibleChunkCoordinates.Y;ChunkY <= MaxVisibleChunkCoordinates.Y;++ChunkY)
+		for(int32 RegionY = MinInitRegionCoordinates.Y;RegionY <= MaxInitRegionCoordinates.Y && NumInitializedRegions < MaxRegionsToCreate;++RegionY)
 		{
-			for(int32 ChunkX = MinVisibleChunkCoordinates.X;ChunkX <= MaxVisibleChunkCoordinates.X;++ChunkX)
+			for(int32 RegionX = MinInitRegionCoordinates.X;RegionX <= MaxInitRegionCoordinates.X && NumInitializedRegions < MaxRegionsToCreate;++RegionX)
 			{
-				const FInt3 ChunkCoordinates(ChunkX,ChunkY,ChunkZ);
-				UBrickChunkComponent* Chunk = ChunkCoordinatesToComponent.FindRef(ChunkCoordinates);
-				if(!Chunk)
+				const FInt3 RegionCoordinates(RegionX,RegionY,RegionZ);
+				const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
+				if(!RegionIndex)
 				{
-					// Ensure that a region is initialized before any chunks within it.
-					const FInt3 RegionCoordinates = SignedShiftRight(ChunkCoordinates,Parameters.ChunksPerRegionLog2);
-					const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
-					if(!RegionIndex)
-					{
-						CreateRegion(RegionCoordinates,OnInitRegion);
-					}
-					CreateChunk(ChunkCoordinates);
+					const int32 RegionIndex = Regions.Num();
+					FBrickRegion& Region = *new(Regions) FBrickRegion;
+					Region.Coordinates = RegionCoordinates;
+
+					// Initialize the region's bricks to the empty material.
+					Region.BrickContents.Init(Parameters.EmptyMaterialIndex, 1 << (BricksPerRegionLog2.X + BricksPerRegionLog2.Y + BricksPerRegionLog2.Z));
+
+					// Add the region to the coordinate map.
+					RegionCoordinatesToIndex.Add(RegionCoordinates,RegionIndex);
+
+					// Call the InitRegion delegate for the new region.
+					OnInitRegion.Execute(RegionCoordinates);
+
+					++NumInitializedRegions;
 				}
 			}
 		}
 	}
-}
 
-void UBrickGridComponent::CreateChunk(const FInt3& Coordinates)
-{
-	// Initialize a new chunk component.
-	UBrickChunkComponent* Chunk = ConstructObject<UBrickChunkComponent>(Parameters.ChunkClass, GetOwner());
-	Chunk->Grid = this;
-	Chunk->Coordinates = Coordinates;
+	// Create render components for any chunks closer to the viewer than the draw distance, and destroy any that are no longer inside the draw distance.
+	const FInt3 MinRenderChunkCoordinates = BrickToChunkCoordinates(Max(MinBrickCoordinates, Floor(LocalViewPosition - FVector(LocalMaxDrawDistance))));
+	const FInt3 MaxRenderChunkCoordinates = BrickToChunkCoordinates(Min(MaxBrickCoordinates, Ceil(LocalViewPosition + FVector(LocalMaxDrawDistance))));
+	for (auto ChunkIt = ChunkCoordinatesToRenderComponent.CreateIterator(); ChunkIt; ++ChunkIt)
+	{
+		if(Any(ChunkIt.Key() < MinRenderChunkCoordinates) || Any(ChunkIt.Key() > MaxRenderChunkCoordinates))
+		{
+			ChunkIt.Value()->DetachFromParent();
+			ChunkIt.Value()->DestroyComponent();
+			ChunkIt.RemoveCurrent();
+		}
+	}
+	for(int32 ChunkZ = MinRenderChunkCoordinates.Z;ChunkZ <= MaxRenderChunkCoordinates.Z;++ChunkZ)
+	{
+		for(int32 ChunkY = MinRenderChunkCoordinates.Y;ChunkY <= MaxRenderChunkCoordinates.Y;++ChunkY)
+		{
+			for(int32 ChunkX = MinRenderChunkCoordinates.X;ChunkX <= MaxRenderChunkCoordinates.X;++ChunkX)
+			{
+				const FInt3 ChunkCoordinates(ChunkX,ChunkY,ChunkZ);
+				UBrickRenderComponent* Chunk = ChunkCoordinatesToRenderComponent.FindRef(ChunkCoordinates);
+				if(!Chunk)
+				{
+					// Initialize a new chunk component.
+					UBrickRenderComponent* Chunk = ConstructObject<UBrickRenderComponent>(UBrickRenderComponent::StaticClass(), GetOwner());
+					Chunk->Grid = this;
+					Chunk->Coordinates = ChunkCoordinates;
 
-	// Set the component transform and register it.
-	Chunk->SetRelativeLocation(FVector(Coordinates.X * BricksPerChunk.X,Coordinates.Y * BricksPerChunk.Y,Coordinates.Z * BricksPerChunk.Z));
-	Chunk->AttachTo(this);
-	Chunk->RegisterComponent();
+					// Set the component transform and register it.
+					Chunk->SetRelativeLocation(FVector(ChunkCoordinates.X * BricksPerChunk.X,ChunkCoordinates.Y * BricksPerChunk.Y,ChunkCoordinates.Z * BricksPerChunk.Z));
+					Chunk->AttachTo(this);
+					Chunk->RegisterComponent();
 
-	// Add the chunk to the coordinate map and visible chunk array.
-	ChunkCoordinatesToComponent.Add(Coordinates,Chunk);
-	VisibleChunks.Add(Chunk);
-}
+					// Add the chunk to the coordinate map and visible chunk array.
+					ChunkCoordinatesToRenderComponent.Add(ChunkCoordinates,Chunk);
+				}
+			}
+		}
+	}
 
-void UBrickGridComponent::CreateRegion(const FInt3& Coordinates,FBrickGrid_InitRegion InitRegion)
-{
-	const int32 RegionIndex = Regions.Num();
-	FBrickRegion& Region = *new(Regions) FBrickRegion;
-	Region.Coordinates = Coordinates;
+	// Create collision components for any chunks closer to the viewer than the collision distance, and destroy any that are no longer inside the draw distance.
+	const FInt3 MinCollisionChunkCoordinates = BrickToChunkCoordinates(Max(MinBrickCoordinates, Floor(LocalViewPosition - FVector(LocalMaxCollisionDistance))));
+	const FInt3 MaxCollisionChunkCoordinates = BrickToChunkCoordinates(Min(MaxBrickCoordinates, Ceil(LocalViewPosition + FVector(LocalMaxCollisionDistance))));
+	for (auto ChunkIt = ChunkCoordinatesToCollisionComponent.CreateIterator(); ChunkIt; ++ChunkIt)
+	{
+		if(Any(ChunkIt.Key() < MinCollisionChunkCoordinates) || Any(ChunkIt.Key() > MaxCollisionChunkCoordinates))
+		{
+			ChunkIt.Value()->DetachFromParent();
+			ChunkIt.Value()->DestroyComponent();
+			ChunkIt.RemoveCurrent();
+		}
+	}
+	for(int32 ChunkZ = MinCollisionChunkCoordinates.Z;ChunkZ <= MaxCollisionChunkCoordinates.Z;++ChunkZ)
+	{
+		for(int32 ChunkY = MinCollisionChunkCoordinates.Y;ChunkY <= MaxCollisionChunkCoordinates.Y;++ChunkY)
+		{
+			for(int32 ChunkX = MinCollisionChunkCoordinates.X;ChunkX <= MaxCollisionChunkCoordinates.X;++ChunkX)
+			{
+				const FInt3 ChunkCoordinates(ChunkX,ChunkY,ChunkZ);
+				UBrickCollisionComponent* Chunk = ChunkCoordinatesToCollisionComponent.FindRef(ChunkCoordinates);
+				if(!Chunk)
+				{
+					// Initialize a new chunk component.
+					UBrickCollisionComponent* Chunk = ConstructObject<UBrickCollisionComponent>(UBrickCollisionComponent::StaticClass(), GetOwner());
+					Chunk->Grid = this;
+					Chunk->Coordinates = ChunkCoordinates;
 
-	// Initialize the region's bricks to the empty material.
-	Region.BrickContents.Init(Parameters.EmptyMaterialIndex, 1 << (BricksPerRegionLog2.X + BricksPerRegionLog2.Y + BricksPerRegionLog2.Z));
+					// Set the component transform and register it.
+					Chunk->SetRelativeLocation(FVector(ChunkCoordinates.X * BricksPerChunk.X,ChunkCoordinates.Y * BricksPerChunk.Y,ChunkCoordinates.Z * BricksPerChunk.Z));
+					Chunk->AttachTo(this);
+					Chunk->RegisterComponent();
 
-	// Add the region to the coordinate map.
-	RegionCoordinatesToIndex.Add(Coordinates,RegionIndex);
-
-	// Call the InitRegion delegate for the new region.
-	InitRegion.Execute(Coordinates);
+					// Add the chunk to the coordinate map and visible chunk array.
+					ChunkCoordinatesToCollisionComponent.Add(ChunkCoordinates,Chunk);
+				}
+			}
+		}
+	}
 }
 
 FBoxSphereBounds UBrickGridComponent::CalcBounds(const FTransform & LocalToWorld) const
@@ -210,7 +273,6 @@ FBrickGridParameters::FBrickGridParameters()
 , ChunksPerRegionLog2(0,0,0)
 , MinRegionCoordinates(-1024,-1024,0)
 , MaxRegionCoordinates(+1024,+1024,0)
-, ChunkClass(UBrickChunkComponent::StaticClass())
 {
 	Materials.Add(FBrickMaterial());
 }
@@ -238,19 +300,25 @@ void UBrickGridComponent::OnRegister()
 {
 	Super::OnRegister();
 
-	for(auto ChunkIt = VisibleChunks.CreateConstIterator();ChunkIt;++ChunkIt)
+	for(auto ChunkIt = ChunkCoordinatesToRenderComponent.CreateConstIterator();ChunkIt;++ChunkIt)
 	{
-		UBrickChunkComponent* Chunk = *ChunkIt;
-		Chunk->RegisterComponent();
+		ChunkIt.Value()->RegisterComponent();
+	}
+	for (auto ChunkIt = ChunkCoordinatesToCollisionComponent.CreateConstIterator(); ChunkIt; ++ChunkIt)
+	{
+		ChunkIt.Value()->RegisterComponent();
 	}
 }
 
 void UBrickGridComponent::OnUnregister()
 {
-	for (auto ChunkIt = VisibleChunks.CreateConstIterator(); ChunkIt; ++ChunkIt)
+	for (auto ChunkIt = ChunkCoordinatesToRenderComponent.CreateConstIterator(); ChunkIt; ++ChunkIt)
 	{
-		UBrickChunkComponent* Chunk = *ChunkIt;
-		Chunk->UnregisterComponent();
+		ChunkIt.Value()->UnregisterComponent();
+	}
+	for (auto ChunkIt = ChunkCoordinatesToCollisionComponent.CreateConstIterator(); ChunkIt; ++ChunkIt)
+	{
+		ChunkIt.Value()->UnregisterComponent();
 	}
 
 	Super::OnUnregister();

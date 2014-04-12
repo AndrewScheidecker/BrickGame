@@ -155,10 +155,6 @@ struct FBrickGridParameters
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Chunks)
 	FInt3 BricksPerChunkLog2;
 
-	// The class to use for chunks.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Chunks)
-	TSubclassOf<class UBrickChunkComponent> ChunkClass;
-
 	// The number of chunks along each axis of a region is 2^ChunksPerRegionLog2
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
 	FInt3 ChunksPerRegionLog2;
@@ -226,7 +222,7 @@ public:
 
 	// Updates the visible chunks for a given view position.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API void UpdateVisibleChunks(const FVector& WorldViewPosition,float MaxDrawDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion InitRegion);
+	BRICKGRID_API void UpdateVisibleChunks(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion InitRegion);
 
 	// The parameters for the grid.
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
@@ -270,13 +266,10 @@ private:
 	UPROPERTY()
 	TArray<struct FBrickRegion> Regions;
 
-	// The currently visibly chunks.
-	UPROPERTY(Transient,DuplicateTransient)
-	TArray<class UBrickChunkComponent*> VisibleChunks;
-
 	// Transient maps to help lookup regions and chunks by coordinates.
 	TMap<FInt3,int32> RegionCoordinatesToIndex;
-	TMap<FInt3,class UBrickChunkComponent*> ChunkCoordinatesToComponent;
+	TMap<FInt3,class UBrickRenderComponent*> ChunkCoordinatesToRenderComponent;
+	TMap<FInt3,class UBrickCollisionComponent*> ChunkCoordinatesToCollisionComponent;
 
 	// Initializes the derived constants from the properties they are derived from.
 	void ComputeDerivedConstants();

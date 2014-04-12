@@ -2,11 +2,11 @@
 
 #pragma once
 #include "BrickGridComponent.h"
-#include "BrickChunkComponent.generated.h"
+#include "BrickRenderComponent.generated.h"
 
-/** Represents rendering and collision for a chunk of a BrickGridComponent. */
+/** Represents rendering for a chunk of a BrickGridComponent. */
 UCLASS(hidecategories=(Object,LOD,Physics), editinlinenew, ClassGroup=Rendering)
-class UBrickChunkComponent : public UPrimitiveComponent
+class UBrickRenderComponent : public UPrimitiveComponent
 {
 	GENERATED_UCLASS_BODY()
 
@@ -28,15 +28,5 @@ public:
 
 	// Begin USceneComponent interface.
 	virtual FBoxSphereBounds CalcBounds(const FTransform & LocalToWorld) const OVERRIDE;
-	virtual class UBodySetup* GetBodySetup() OVERRIDE;
 	// End USceneComponent interface.
-
-private:
-
-	// Collision body.
-	UPROPERTY(transient, duplicatetransient)
-	class UBodySetup* CollisionBodySetup;
-
-	// Initializes the collision body.
-	void UpdateCollisionBody();
 };

@@ -1,7 +1,7 @@
 // Copyright 2014, Andrew Scheidecker. All Rights Reserved. 
 
 #include "BrickGridPluginPrivatePCH.h"
-#include "BrickChunkComponent.h"
+#include "BrickRenderComponent.h"
 #include "BrickGridComponent.h"
 
 // Maps brick corner indices to 3D coordinates.
@@ -148,7 +148,7 @@ class FBrickChunkSceneProxy : public FPrimitiveSceneProxy
 {
 public:
 
-	FBrickChunkSceneProxy(UBrickChunkComponent* Component)
+	FBrickChunkSceneProxy(UBrickRenderComponent* Component)
 	: FPrimitiveSceneProxy(Component)
 	{
 		const double StartTime = FPlatformTime::Seconds();
@@ -368,7 +368,7 @@ private:
 	}
 };
 
-UBrickChunkComponent::UBrickChunkComponent( const FPostConstructInitializeProperties& PCIP )
+UBrickRenderComponent::UBrickRenderComponent( const FPostConstructInitializeProperties& PCIP )
 	: Super( PCIP )
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -377,102 +377,30 @@ UBrickChunkComponent::UBrickChunkComponent( const FPostConstructInitializeProper
 	bCanEverAffectNavigation = true;	
 	bAutoRegister = false;
 
-	CollisionBodySetup = ConstructObject<UBodySetup>(UBodySetup::StaticClass(), this);
-	CollisionBodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
-	SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
+	SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
 }
 
-FPrimitiveSceneProxy* UBrickChunkComponent::CreateSceneProxy()
+FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 {
-	// Update the collision body if the rendering proxy has been recreated for any reason, since the causes mostly also invalidate the collision body.
-	UpdateCollisionBody();
-
 	return new FBrickChunkSceneProxy(this);
 }
 
-int32 UBrickChunkComponent::GetNumMaterials() const
+int32 UBrickRenderComponent::GetNumMaterials() const
 {
 	return Grid->Parameters.Materials.Num();
 }
 
-class UMaterialInterface* UBrickChunkComponent::GetMaterial(int32 ElementIndex) const
+class UMaterialInterface* UBrickRenderComponent::GetMaterial(int32 ElementIndex) const
 {
 	return Grid != NULL && ElementIndex >= 0 && ElementIndex < Grid->Parameters.Materials.Num() 
 		? Grid->Parameters.Materials[ElementIndex].SurfaceMaterial
 		: NULL;
 }
 
-FBoxSphereBounds UBrickChunkComponent::CalcBounds(const FTransform & LocalToWorld) const
+FBoxSphereBounds UBrickRenderComponent::CalcBounds(const FTransform & LocalToWorld) const
 {
 	FBoxSphereBounds NewBounds;
 	NewBounds.Origin = NewBounds.BoxExtent = FVector(Grid->BricksPerChunk.X,Grid->BricksPerChunk.Y,Grid->BricksPerChunk.Z) / 2.0f;
 	NewBounds.SphereRadius = NewBounds.BoxExtent.Size();
 	return NewBounds.TransformBy(LocalToWorld);
-}
-
-class UBodySetup* UBrickChunkComponent::GetBodySetup()
-{
-	if (!CollisionBodySetup)
-	{
-		UpdateCollisionBody();
-	}
-	return CollisionBodySetup;
-}
-
-void UBrickChunkComponent::UpdateCollisionBody()
-{
-	const double StartTime = FPlatformTime::Seconds();
-
-	CollisionBodySetup->AggGeom.BoxElems.Reset();
-
-	// Iterate over each brick in the chunk.
-	const FInt3 BricksPerChunk = Grid->BricksPerChunk;
-	const FInt3 MinBrickCoordinates = Coordinates << Grid->Parameters.BricksPerChunkLog2;
-	const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerChunk + FInt3::Scalar(1);
-	const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
-	for(int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
-	{
-		for(int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
-		{
-			for(int32 Z = MinBrickCoordinates.Z; Z < MaxBrickCoordinatesPlus1.Z; ++Z)
-			{
-				// Only create collision boxes for bricks that aren't empty.
-				const FInt3 BrickCoordinates(X,Y,Z);
-				const int32 BrickMaterial = Grid->GetBrick(BrickCoordinates);
-				if (BrickMaterial != EmptyMaterialIndex)
-				{
-					// Only create collision boxes for bricks that are adjacent to an empty brick.
-					bool HasEmptyNeighbor = false;
-					for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
-					{
-						if(Grid->GetBrick(BrickCoordinates + FaceNormals[FaceIndex]) == EmptyMaterialIndex)
-						{
-							HasEmptyNeighbor = true;
-							break;
-						}
-					}
-					if(HasEmptyNeighbor)
-					{
-						FKBoxElem& BoxElement = *new(CollisionBodySetup->AggGeom.BoxElems) FKBoxElem;
-
-						// Physics bodies are uniformly scaled by the minimum component of the 3D scale.
-						// Compute the non-uniform scaling components to apply to the box center/extent.
-						const FVector AbsScale3D = ComponentToWorld.GetScale3D().GetAbs();
-						const FVector NonUniformScale3D = AbsScale3D / AbsScale3D.GetMin();
-
-						// Set the box center and size.
-						BoxElement.Center = ((FVector)(BrickCoordinates - MinBrickCoordinates) + FVector(0.5f)) * NonUniformScale3D;
-						BoxElement.X = NonUniformScale3D.X;
-						BoxElement.Y = NonUniformScale3D.Y;
-						BoxElement.Z = NonUniformScale3D.Z;
-					}
-				}
-			}
-		}
-	}
-
-	// Recreate the physics state, which includes an Face of the CollisionBodySetup.
-	RecreatePhysicsState();
-
-	UE_LOG(LogStats,Log,TEXT("UBrickChunkComponent::UpdateCollisionBody took %fms to create %u boxes"),1000.0f * float(FPlatformTime::Seconds() - StartTime),CollisionBodySetup->AggGeom.BoxElems.Num());
 }
