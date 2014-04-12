@@ -151,6 +151,8 @@ public:
 	FBrickChunkSceneProxy(UBrickChunkComponent* Component)
 	: FPrimitiveSceneProxy(Component)
 	{
+		const double StartTime = FPlatformTime::Seconds();
+
 		// Batch the faces by material and direction.
 		struct FFaceBatch
 		{
@@ -263,6 +265,8 @@ public:
 			VertexFactories[FaceIndex].Init(VertexBuffer,FaceIndex);
 			BeginInitResource(&VertexFactories[FaceIndex]);
 		}
+
+		UE_LOG(LogStats,Log,TEXT("FBrickChunkSceneProxy constructor took %fms to create %u indices and %u vertices"),1000.0f * float(FPlatformTime::Seconds() - StartTime),IndexBuffer.Indices.Num(),VertexBuffer.Vertices.Num());
 	}
 
 	virtual ~FBrickChunkSceneProxy()
@@ -416,6 +420,8 @@ class UBodySetup* UBrickChunkComponent::GetBodySetup()
 
 void UBrickChunkComponent::UpdateCollisionBody()
 {
+	const double StartTime = FPlatformTime::Seconds();
+
 	CollisionBodySetup->AggGeom.BoxElems.Reset();
 
 	// Iterate over each brick in the chunk.
@@ -466,4 +472,6 @@ void UBrickChunkComponent::UpdateCollisionBody()
 
 	// Recreate the physics state, which includes an Face of the CollisionBodySetup.
 	RecreatePhysicsState();
+
+	UE_LOG(LogStats,Log,TEXT("UBrickChunkComponent::UpdateCollisionBody took %fms to create %u boxes"),1000.0f * float(FPlatformTime::Seconds() - StartTime),CollisionBodySetup->AggGeom.BoxElems.Num());
 }

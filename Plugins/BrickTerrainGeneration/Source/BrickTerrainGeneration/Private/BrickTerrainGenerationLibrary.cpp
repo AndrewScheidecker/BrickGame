@@ -116,5 +116,5 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 	const FInt3 MaxChunkCoordinates = Grid->BrickToChunkCoordinates(MaxRegionBrickCoordinates);
 	Grid->InvalidateChunkComponents(MinChunkCoordinates,MaxChunkCoordinates);
 
-	UE_LOG(LogInit,Log,TEXT("UBrickTerrainGenerationLibrary::InitRegion took %fms"),1000.0f * float(FPlatformTime::Seconds() - StartTime));
+	UE_LOG(LogStats,Log,TEXT("UBrickTerrainGenerationLibrary::InitRegion took %fms"),1000.0f * float(FPlatformTime::Seconds() - StartTime));
 }
