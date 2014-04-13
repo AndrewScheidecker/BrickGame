@@ -2,15 +2,27 @@
 
 This is a simple game (little modified from the first-person template that comes with UE4), meant to demonstrate the BrickGrid plugin (https://github.com/AndrewScheidecker/BrickGame/tree/master/Plugins/BrickGrid/Source/BrickGrid).
 
-BrickGrid adds a PrimitiveComponent class that reproduces Minecraft-style voxel rendering. The grid's "bricks" are cubes that may contain some material.
+The BrickGrid plugin adds a component that imitates Minecraft's bricks. The bricks are cubes that may contain some material, arranged in a 3D grid.
 
-Rendering works, and collision works (in a flaky way), but both are not set up for real-time updates to subsets of the bricks. The current code will recreate the rendering resources for the entire grid if only a single voxel changes, so it isn't quite capable of allowing players to modify it during gameplay.
-
-All of the procedural terrain generation happens in BluePrint, but it uses a simplex noise function implemented in C++ (https://github.com/AndrewScheidecker/BrickGame/tree/master/Plugins/SimplexNoise).
-
-The BrickGrid, SuperLoop, and SimplexNoise plugins don't have any dependencies apart from built-in UE4 modules, so it should be easy to drop them into your own game individually or as a group.
+Most of the functionality is implemented in plugins, so you can use those plugins from your own game project without modifying their source code.
 
 ![ScreenShot](https://raw.githubusercontent.com/AndrewScheidecker/BrickGame/master/Screenshot.jpg)
+
+# Building the source code
+
+1. Install UE4.1 (or newer). Thus far I've been using the UE4.1 preview build, built from source.
+2. Right click on the BrickGame.uproject, and select "Generate Visual Studio Projects".
+3. Open the BrickGame.sln that is created, and run the "Development Editor" configuration of the BrickGame project.
+
+# Keys
+
+Left Mouse Button: Add a brick of the selected material
+Right Mouse Button: Remove a brick
+Middle Mouse Button: Select the brick material you're aiming at
+Mouse wheel: Change selected brick material
+L: Toggle flashlight
+F6: Save the game
+F7: Load the game
 
 # License
 
