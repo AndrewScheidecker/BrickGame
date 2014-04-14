@@ -52,21 +52,35 @@ struct FBrickTerrainGenerationParameters
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
 	float Scale;
 
-	// The number of world-units per noise parameter unit for the height-map.
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
-	FNoiseFunction RockHeightFunction;
+	FNoiseFunction UnerodedHeightFunction;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
-	FNoiseFunction DirtHeightFunction;
+	FNoiseFunction ErodedHeightFunction;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	FNoiseFunction MoistureFunction;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	FNoiseFunction ErosionFunction;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	FNoiseFunction DirtProbabilityFunction;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	UCurveFloat* DirtThresholdByHeight;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
 	FNoiseFunction CavernProbabilityFunction;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
-	float CavernThreshold;
+	UCurveFloat* CavernThresholdByHeight;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
-	float CavernProbabilityHeightBias;
+	float DirtCavernThresholdBias;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	float GrassMoistureThreshold;
 
 	// The material index for rock.
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
@@ -76,12 +90,16 @@ struct FBrickTerrainGenerationParameters
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
 	int32 DirtMaterialIndex;
 
+	// The material index for grass.
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	int32 GrassMaterialIndex;
+
+	// The material index to use for the bottom of the map.
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	int32 BottomMaterialIndex;
+
 	FBrickTerrainGenerationParameters()
-	: Seed()
-	, Scale(10000.0f)
-	, CavernThreshold(0.95f)
-	, RockMaterialIndex()
-	, DirtMaterialIndex()
+	: Scale(1.0f)
 	{}
 };
 
