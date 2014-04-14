@@ -30,10 +30,9 @@ void ABrickGameCharacter::SetupPlayerInputComponent(class UInputComponent* Input
 	// set up gameplay key bindings
 	check(InputComponent);
 
-	InputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
-
 	InputComponent->BindAxis("MoveForward", this, &ABrickGameCharacter::MoveForward);
 	InputComponent->BindAxis("MoveRight", this, &ABrickGameCharacter::MoveRight);
+	InputComponent->BindAxis("MoveUp", this, &ABrickGameCharacter::MoveUp);
 	
 	// We have 2 versions of the rotation bindings to handle different kinds of devices differently
 	// "turn" handles devices that provide an absolute delta, such as a mouse.
@@ -50,10 +49,9 @@ void ABrickGameCharacter::MoveForward(float Value)
 	{
 		// find out which way is forward
 		const FRotator Rotation = GetControlRotation();
-		FRotator YawRotation(0, Rotation.Yaw, 0);
 
 		// Get forward vector
-		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::X);
 
 		// add movement in that direction
 		AddMovementInput(Direction, Value);
@@ -66,13 +64,20 @@ void ABrickGameCharacter::MoveRight(float Value)
 	{
 		// find out which way is right
 		const FRotator Rotation = GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
 
 		// Get right vector
-		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+		const FVector Direction = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y);
 
 		// add movement in that direction
 		AddMovementInput(Direction, Value);
+	}
+}
+
+void ABrickGameCharacter::MoveUp(float Value)
+{
+	if(Value != 0.0f)
+	{
+		AddMovementInput(FVector(0,0,1), Value);
 	}
 }
 
