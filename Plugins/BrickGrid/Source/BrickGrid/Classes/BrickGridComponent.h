@@ -54,14 +54,14 @@ struct FInt3
 	}
 
 	operator FIntVector() const { return FIntVector(X,Y,Z); }
-	operator FVector() const { return FVector(X,Y,Z); }
+	FVector ToFloat() const { return FVector(X,Y,Z); }
 
 	friend uint32 GetTypeHash(const FInt3& Coordinates)
 	{
 		return FCrc::MemCrc32(&Coordinates,sizeof(Coordinates));
 	}
 	#define DEFINE_VECTOR_OPERATOR(symbol) \
-		friend FInt3 operator##symbol(const FInt3& A, const FInt3& B) \
+		friend FInt3 operator symbol(const FInt3& A, const FInt3& B) \
 		{ \
 			return FInt3(A.X symbol B.X, A.Y symbol B.Y, A.Z symbol B.Z); \
 		}
@@ -80,43 +80,43 @@ struct FInt3
 	{
 		return A.X == B.X && A.Y == B.Y && A.Z == B.Z;
 	}
-	friend FInt3 SignedShiftRight(const FInt3& A,const FInt3& B)
+	static inline FInt3 SignedShiftRight(const FInt3& A,const FInt3& B)
 	{
-		return FInt3(SignedShiftRight(A.X,B.X),SignedShiftRight(A.Y,B.Y),SignedShiftRight(A.Z,B.Z));
+		return FInt3(::SignedShiftRight(A.X,B.X),::SignedShiftRight(A.Y,B.Y),::SignedShiftRight(A.Z,B.Z));
 	}
-	friend FInt3 Exp2(const FInt3& A)
+	static inline FInt3 Exp2(const FInt3& A)
 	{
 		return FInt3(1 << A.X,1 << A.Y,1 << A.Z);
 	}
-	friend FInt3 CeilLog2(const FInt3& A)
+	static inline FInt3 CeilLog2(const FInt3& A)
 	{
 		return FInt3(FMath::CeilLogTwo(A.X),FMath::CeilLogTwo(A.Z),FMath::CeilLogTwo(A.Z));
 	}
-	friend FInt3 Max(const FInt3& A,const FInt3& B)
+	static inline FInt3 Max(const FInt3& A,const FInt3& B)
 	{
 		return FInt3(FMath::Max(A.X, B.X), FMath::Max(A.Y, B.Y), FMath::Max(A.Z, B.Z));
 	}
-	friend FInt3 Min(const FInt3& A,const FInt3& B)
+	static inline FInt3 Min(const FInt3& A,const FInt3& B)
 	{
 		return FInt3(FMath::Min(A.X, B.X), FMath::Min(A.Y, B.Y), FMath::Min(A.Z, B.Z));
 	}
-	friend FInt3 Clamp(const FInt3& A,const FInt3& MinA,const FInt3& MaxA)
+	static inline FInt3 Clamp(const FInt3& A,const FInt3& MinA,const FInt3& MaxA)
 	{
 		return Min(Max(A,MinA),MaxA);
 	}
-	friend FInt3 Floor(const FVector& V)
+	static inline FInt3 Floor(const FVector& V)
 	{
 		return FInt3(FMath::Floor(V.X),FMath::Floor(V.Y),FMath::Floor(V.Z));
 	}
-	friend FInt3 Ceil(const FVector& V)
+	static inline FInt3 Ceil(const FVector& V)
 	{
 		return FInt3(FMath::Ceil(V.X),FMath::Ceil(V.Y),FMath::Ceil(V.Z));
 	}
-	friend bool Any(const FInt3& A)
+	static inline bool Any(const FInt3& A)
 	{
 		return A.X || A.Y || A.Z;
 	}
-	friend bool All(const FInt3& A)
+	static inline bool All(const FInt3& A)
 	{
 		return A.X && A.Y && A.Z;
 	}
@@ -151,19 +151,23 @@ struct FBrickGridParameters
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Materials)
 	int32 EmptyMaterialIndex;
 
-	// The number of bricks along each axis of a chunk is 2^BricksPerChunkLog2
+	// The number of bricks along each axis of a region is 2^BricksPerChunkLog2
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Chunks)
-	FInt3 BricksPerChunkLog2;
+	FInt3 BricksPerRegionLog2;
 
 	// The number of chunks along each axis of a region is 2^ChunksPerRegionLog2
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
-	FInt3 ChunksPerRegionLog2;
+	FInt3 RenderChunksPerRegionLog2;
 
-	// The minimum chunk coordinates allowed.
+	// The number of collision chunks along each axis of a region is 2^ChunksPerRegionLog2
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
+	FInt3 CollisionChunksPerRegionLog2;
+
+	// The minimum region coordinates allowed.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
 	FInt3 MinRegionCoordinates;
 
-	// The maximum chunk coordinates allowed.
+	// The maximum region coordinates allowed.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
 	FInt3 MaxRegionCoordinates;
 
@@ -181,10 +185,10 @@ struct FBrickGridData
 	TArray<struct FBrickRegion> Regions;
 };
 
-// The type of OnInitChunk delegates.
+// The type of OnInitRegion delegates.
 DECLARE_DYNAMIC_DELEGATE_OneParam(FBrickGrid_InitRegion,FInt3,RegionCoordinates);
 
-/** A 3D grid of brick chunks. */
+/** A 3D grid of bricks. */
 UCLASS(hidecategories=(Object,LOD, Physics), editinlinenew, meta=(BlueprintSpawnableComponent), ClassGroup=Rendering)
 class UBrickGridComponent : public USceneComponent
 {
@@ -218,7 +222,7 @@ public:
 
 	// Invalidates the chunk components for a range of brick coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API void InvalidateChunkComponents(const FInt3& MinChunkCoordinates,const FInt3& MaxChunkCoordinates);
+	BRICKGRID_API void InvalidateChunkComponents(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates);
 
 	// Updates the visible chunks for a given view position.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
@@ -231,11 +235,17 @@ public:
 	// Properties derived from the grid parameters.
 
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
-	FInt3 BricksPerChunk;
+	FInt3 BricksPerRenderChunk;
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
-	FInt3 ChunksPerRegion;
+	FInt3 BricksPerCollisionChunk;
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
-	FInt3 BricksPerRegionLog2;
+	FInt3 BricksPerRenderChunkLog2;
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
+	FInt3 BricksPerCollisionChunkLog2;
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
+	FInt3 RenderChunksPerRegion;
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
+	FInt3 CollisionChunksPerRegion;
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FInt3 BricksPerRegion;
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
@@ -243,13 +253,17 @@ public:
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FInt3 MaxBrickCoordinates;
 
-	inline FInt3 BrickToChunkCoordinates(const FInt3& BrickCoordinates) const
+	inline FInt3 BrickToRenderChunkCoordinates(const FInt3& BrickCoordinates) const
 	{
-		return SignedShiftRight(BrickCoordinates,Parameters.BricksPerChunkLog2);
+		return FInt3::SignedShiftRight(BrickCoordinates,BricksPerRenderChunkLog2);
+	}
+	inline FInt3 BrickToCollisionChunkCoordinates(const FInt3& BrickCoordinates) const
+	{
+		return FInt3::SignedShiftRight(BrickCoordinates,BricksPerCollisionChunkLog2);
 	}
 	inline FInt3 BrickToRegionCoordinates(const FInt3& BrickCoordinates) const
 	{
-		return SignedShiftRight(BrickCoordinates,BricksPerRegionLog2);
+		return FInt3::SignedShiftRight(BrickCoordinates,Parameters.BricksPerRegionLog2);
 	}
 
 	// USceneComponent interface.
@@ -268,8 +282,8 @@ private:
 
 	// Transient maps to help lookup regions and chunks by coordinates.
 	TMap<FInt3,int32> RegionCoordinatesToIndex;
-	TMap<FInt3,class UBrickRenderComponent*> ChunkCoordinatesToRenderComponent;
-	TMap<FInt3,class UBrickCollisionComponent*> ChunkCoordinatesToCollisionComponent;
+	TMap<FInt3,class UBrickRenderComponent*> RenderChunkCoordinatesToComponent;
+	TMap<FInt3,class UBrickCollisionComponent*> CollisionChunkCoordinatesToComponent;
 
 	// Initializes the derived constants from the properties they are derived from.
 	void ComputeDerivedConstants();

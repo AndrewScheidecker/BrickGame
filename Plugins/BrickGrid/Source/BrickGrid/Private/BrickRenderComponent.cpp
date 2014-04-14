@@ -102,7 +102,7 @@ public:
 	{
 		const FVector UnprojectedTangentX = FVector(+1,-1,0).SafeNormal();
 		const FVector UnprojectedTangentY(-1,-1,-1);
-		const FVector FaceNormal = FaceNormals[FaceIndex];
+		const FVector FaceNormal = FaceNormals[FaceIndex].ToFloat();
 		const FVector ProjectedFaceTangentX = (UnprojectedTangentX - FaceNormal * (UnprojectedTangentX | FaceNormal)).SafeNormal();
 		TangentXBuffer.Tangents.Add(FPackedNormal(ProjectedFaceTangentX));
 		TangentZBuffer.Tangents.Add(FPackedNormal(FVector4(FaceNormal, FMath::Sign(UnprojectedTangentY | (FaceNormal ^ ProjectedFaceTangentX)))));
@@ -167,9 +167,8 @@ public:
 
 		// Iterate over each brick in the chunk.
 		const UBrickGridComponent* Grid = Component->Grid;
-		const FInt3 BricksPerChunk = Grid->BricksPerChunk;
-		const FInt3 MinBrickCoordinates = Component->Coordinates << Grid->Parameters.BricksPerChunkLog2;
-		const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerChunk + FInt3::Scalar(1);
+		const FInt3 MinBrickCoordinates = Component->Coordinates << Grid->BricksPerRenderChunkLog2;
+		const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + Grid->BricksPerRenderChunk + FInt3::Scalar(1);
 		const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
 		for(int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
 		{
@@ -400,7 +399,7 @@ class UMaterialInterface* UBrickRenderComponent::GetMaterial(int32 ElementIndex)
 FBoxSphereBounds UBrickRenderComponent::CalcBounds(const FTransform & LocalToWorld) const
 {
 	FBoxSphereBounds NewBounds;
-	NewBounds.Origin = NewBounds.BoxExtent = FVector(Grid->BricksPerChunk.X,Grid->BricksPerChunk.Y,Grid->BricksPerChunk.Z) / 2.0f;
+	NewBounds.Origin = NewBounds.BoxExtent = Grid->BricksPerRenderChunk.ToFloat() / 2.0f;
 	NewBounds.SphereRadius = NewBounds.BoxExtent.Size();
 	return NewBounds.TransformBy(LocalToWorld);
 }

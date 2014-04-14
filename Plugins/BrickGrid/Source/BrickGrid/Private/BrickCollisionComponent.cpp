@@ -38,7 +38,7 @@ FPrimitiveSceneProxy* UBrickCollisionComponent::CreateSceneProxy()
 FBoxSphereBounds UBrickCollisionComponent::CalcBounds(const FTransform & LocalToWorld) const
 {
 	FBoxSphereBounds NewBounds;
-	NewBounds.Origin = NewBounds.BoxExtent = FVector(Grid->BricksPerChunk.X,Grid->BricksPerChunk.Y,Grid->BricksPerChunk.Z) / 2.0f;
+	NewBounds.Origin = NewBounds.BoxExtent = Grid->BricksPerCollisionChunk.ToFloat() / 2.0f;
 	NewBounds.SphereRadius = NewBounds.BoxExtent.Size();
 	return NewBounds.TransformBy(LocalToWorld);
 }
@@ -59,9 +59,8 @@ void UBrickCollisionComponent::UpdateCollisionBody()
 	CollisionBodySetup->AggGeom.BoxElems.Reset();
 
 	// Iterate over each brick in the chunk.
-	const FInt3 BricksPerChunk = Grid->BricksPerChunk;
-	const FInt3 MinBrickCoordinates = Coordinates << Grid->Parameters.BricksPerChunkLog2;
-	const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + BricksPerChunk + FInt3::Scalar(1);
+	const FInt3 MinBrickCoordinates = Coordinates << Grid->BricksPerCollisionChunkLog2;
+	const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + Grid->BricksPerCollisionChunk + FInt3::Scalar(1);
 	const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
 	for(int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
 	{
@@ -94,7 +93,7 @@ void UBrickCollisionComponent::UpdateCollisionBody()
 						const FVector NonUniformScale3D = AbsScale3D / AbsScale3D.GetMin();
 
 						// Set the box center and size.
-						BoxElement.Center = ((FVector)(BrickCoordinates - MinBrickCoordinates) + FVector(0.5f)) * NonUniformScale3D;
+						BoxElement.Center = ((BrickCoordinates - MinBrickCoordinates).ToFloat() + FVector(0.5f)) * NonUniformScale3D;
 						BoxElement.X = NonUniformScale3D.X;
 						BoxElement.Y = NonUniformScale3D.Y;
 						BoxElement.Z = NonUniformScale3D.Z;
