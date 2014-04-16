@@ -32,6 +32,22 @@ struct FBrickMaterial
 	FBrickMaterial() : SurfaceMaterial(NULL) {}
 };
 
+/** Information about a brick. */
+USTRUCT(BlueprintType)
+struct FBrick
+{
+	GENERATED_USTRUCT_BODY()
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = Bricks)
+	int32 MaterialIndex;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = Bricks)
+	uint8 AmbientOcclusionFactor;
+
+	FBrick() {}
+	FBrick(int32 InMaterialIndex,uint8 InAmbientOcclusionFactor) : MaterialIndex(InMaterialIndex), AmbientOcclusionFactor(InAmbientOcclusionFactor) {}
+};
+
 /** A 3D integer vector. */
 USTRUCT(BlueprintType,Atomic)
 struct FInt3
@@ -132,9 +148,18 @@ struct FBrickRegion
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category=Region)
 	FInt3 Coordinates;
 
-	// Contains the material index for each brick, packed into 32-bit integers.
+	// Contains the material index for each brick, stored in an 8-bit integer.
 	UPROPERTY()
 	TArray<uint8> BrickContents;
+
+	// Contains an ambient occlusion factor for each brick, stored as 8-bit number where 255=1.0.
+	UPROPERTY(Transient)
+	TArray<uint8> BrickAmbientOcclusion;
+
+	UPROPERTY(Transient)
+	bool HasAmbientOcclusionFactors;
+
+	FBrickRegion(): HasAmbientOcclusionFactors() {}
 };
 
 /** The parameters for a BrickGridComponent. */
@@ -170,6 +195,10 @@ struct FBrickGridParameters
 	// The maximum region coordinates allowed.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
 	FInt3 MaxRegionCoordinates;
+
+	// The radius in bricks of the blur applied to the ambient occlusion.
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category=Lighting)
+	int32 AmbientOcclusionBlurRadius;
 
 	FBrickGridParameters();
 };
@@ -210,7 +239,7 @@ public:
 
 	// Reads the brick at the given coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API int32 GetBrick(const FInt3& BrickCoordinates) const;
+	BRICKGRID_API FBrick GetBrick(const FInt3& BrickCoordinates) const;
 
 	// Writes the brick at the given coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
@@ -224,9 +253,13 @@ public:
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API void InvalidateChunkComponents(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates);
 
+	// Ensures that ambient occlusion is up-to-date for a range of brick coordinates.
+	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
+	BRICKGRID_API void UpdateAO(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates);
+
 	// Updates the visible chunks for a given view position.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API void UpdateVisibleChunks(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion InitRegion);
+	BRICKGRID_API void Update(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion InitRegion);
 
 	// The parameters for the grid.
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
@@ -293,4 +326,18 @@ private:
 
 	// Creates a region for the given coordinates.
 	void CreateRegion(const FInt3& Coordinates,FBrickGrid_InitRegion OnInitRegion);
+
+	// Updates the ambient occlusion for a region.
+	void UpdateRegionAO(const FInt3& RegionCoordinates);
+
+	// Maps brick coordinates within a region to a brick index.
+	inline uint32 SubregionBrickCoordinatesToRegionBrickIndex(const FInt3 SubregionBrickCoordinates) const
+	{
+		return (((SubregionBrickCoordinates.Y << Parameters.BricksPerRegionLog2.X) + SubregionBrickCoordinates.X) << Parameters.BricksPerRegionLog2.Z) + SubregionBrickCoordinates.Z;
+	}
+	inline uint32 BrickCoordinatesToRegionBrickIndex(const FInt3& RegionCoordinates,const FInt3& BrickCoordinates) const
+	{
+		return SubregionBrickCoordinatesToRegionBrickIndex(BrickCoordinates - (RegionCoordinates << Parameters.BricksPerRegionLog2));
+		
+	}
 };

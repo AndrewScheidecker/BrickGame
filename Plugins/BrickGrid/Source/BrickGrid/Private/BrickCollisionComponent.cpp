@@ -70,14 +70,14 @@ void UBrickCollisionComponent::UpdateCollisionBody()
 			{
 				// Only create collision boxes for bricks that aren't empty.
 				const FInt3 BrickCoordinates(X,Y,Z);
-				const int32 BrickMaterial = Grid->GetBrick(BrickCoordinates);
+				const int32 BrickMaterial = Grid->GetBrick(BrickCoordinates).MaterialIndex;
 				if (BrickMaterial != EmptyMaterialIndex)
 				{
 					// Only create collision boxes for bricks that are adjacent to an empty brick.
 					bool HasEmptyNeighbor = false;
 					for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 					{
-						if(Grid->GetBrick(BrickCoordinates + FaceNormals[FaceIndex]) == EmptyMaterialIndex)
+						if(Grid->GetBrick(BrickCoordinates + FaceNormals[FaceIndex]).MaterialIndex == EmptyMaterialIndex)
 						{
 							HasEmptyNeighbor = true;
 							break;

@@ -37,7 +37,7 @@ struct FBrickVertex
 	uint8 X;
 	uint8 Y;
 	uint8 Z;
-	uint8 Padding0;
+	uint8 AmbientOcclusionFactor;
 };
 
 /** Vertex Buffer */
@@ -111,6 +111,7 @@ public:
 		DataType NewData;
 		NewData.PositionComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N);
 		NewData.TextureCoordinates.Add(STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N));
+		NewData.ColorComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N);
 		// Use a stride of 0 to use the same TangentX/TangentZ for all faces using this vertex factory.
 		NewData.TangentBasisComponents[0] = FVertexStreamComponent(&TangentXBuffer,0,0,VET_PackedNormal);
 		NewData.TangentBasisComponents[1] = FVertexStreamComponent(&TangentZBuffer,0,0,VET_PackedNormal);
@@ -165,38 +166,99 @@ public:
 		TArray<FMaterialBatch> MaterialBatches;
 		MaterialBatches.Init(FMaterialBatch(),Component->Grid->Parameters.Materials.Num());
 
-		// Iterate over each brick in the chunk.
-		const UBrickGridComponent* Grid = Component->Grid;
+		// Update the AO for this chunk's bricks (and those adjacent, for filtering).
+		UBrickGridComponent* Grid = Component->Grid;
 		const FInt3 MinBrickCoordinates = Component->Coordinates << Grid->BricksPerRenderChunkLog2;
-		const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + Grid->BricksPerRenderChunk + FInt3::Scalar(1);
-		const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
-		for(int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
+		const FInt3 MaxBrickCoordinates = MinBrickCoordinates + Grid->BricksPerRenderChunk - FInt3::Scalar(1);
+		const FInt3 MinAdjacentBrickCoordinates = MinBrickCoordinates - FInt3::Scalar(1);
+		const FInt3 MaxAdjacentBrickCoordinates = MaxBrickCoordinates + FInt3::Scalar(1);
+		Grid->UpdateAO(MinAdjacentBrickCoordinates,MaxAdjacentBrickCoordinates);
+
+		// Read the brick materials and ambient occlusion for this chunk and adjacent bricks.
+		const FInt3 AdjacentBricksDim = Grid->BricksPerRenderChunk + FInt3::Scalar(2);
+		TArray<uint8> BrickAmbientFactors;
+		TArray<uint8> BrickMaterials;
+		BrickAmbientFactors.Init(AdjacentBricksDim.X * AdjacentBricksDim.Y * AdjacentBricksDim.Z);
+		BrickMaterials.Init(AdjacentBricksDim.X * AdjacentBricksDim.Y * AdjacentBricksDim.Z);
+		for(int32 LocalY = 0; LocalY < AdjacentBricksDim.Y; ++LocalY)
 		{
-			for(int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
+			for(int32 LocalX = 0; LocalX < AdjacentBricksDim.X; ++LocalX)
 			{
-				for(int32 Z = MinBrickCoordinates.Z; Z < MaxBrickCoordinatesPlus1.Z; ++Z)
+				for(int32 LocalZ = 0; LocalZ < AdjacentBricksDim.Z; ++LocalZ)
+				{
+					const FBrick Brick = Grid->GetBrick(MinAdjacentBrickCoordinates + FInt3(LocalX,LocalY,LocalZ));
+					const uint32 LocalIndex = (LocalY * AdjacentBricksDim.X + LocalX) * AdjacentBricksDim.Z + LocalZ;
+					BrickMaterials[LocalIndex] = Brick.MaterialIndex;
+					BrickAmbientFactors[LocalIndex] = Brick.AmbientOcclusionFactor;
+				}
+			}
+		}
+
+		// Compute a filtered per-vertex ambient occlusion factor.
+		const FInt3 VertexDim = Grid->BricksPerRenderChunk + FInt3::Scalar(1);
+		TArray<uint8> VertexAmbientFactors;
+		VertexAmbientFactors.Init(VertexDim.X * VertexDim.Y * VertexDim.Z);
+		for(int32 VertexY = 0; VertexY < VertexDim.Y; ++VertexY)
+		{
+			for(int32 VertexX = 0; VertexX < VertexDim.X; ++VertexX)
+			{
+				for(int32 VertexZ = 0; VertexZ < VertexDim.Z; ++VertexZ)
+				{
+					uint32 AdjacentAmbientFactorSum = 0;
+					for(uint32 AdjacentIndex = 0;AdjacentIndex < 8;++AdjacentIndex)
+					{
+						const uint32 LocalX = VertexX + ((AdjacentIndex >> 0) & 1);
+						const uint32 LocalY = VertexY + ((AdjacentIndex >> 1) & 1);
+						const uint32 LocalZ = VertexZ + (AdjacentIndex >> 2);
+						const uint32 LocalIndex = (LocalY * AdjacentBricksDim.X + LocalX) * AdjacentBricksDim.Z + LocalZ;
+						AdjacentAmbientFactorSum += BrickAmbientFactors[LocalIndex];
+					}
+
+					// Average the ambient factor from all 8 bricks adjacent to the vertex.
+					// Normalize it with an implicit factor of 2 since we'll treat the result as a hemisphere percent.
+					const uint8 AverageAdjacentAmbientFactor = (uint8)FMath::Min<uint32>(255,AdjacentAmbientFactorSum / 4);
+
+					const uint32 VertexIndex = (VertexY * VertexDim.X + VertexX) * VertexDim.Z + VertexZ;
+					VertexAmbientFactors[VertexIndex] = AverageAdjacentAmbientFactor;
+				}
+			}
+		}
+
+		// Iterate over each brick in the chunk.
+		const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
+		for(int32 LocalY = 1; LocalY < Grid->BricksPerRenderChunk.Y + 1; ++LocalY)
+		{
+			for(int32 LocalX = 1; LocalX < Grid->BricksPerRenderChunk.X + 1; ++LocalX)
+			{
+				for(int32 LocalZ = 1; LocalZ < Grid->BricksPerRenderChunk.Z + 1; ++LocalZ)
 				{
 					// Only draw faces of bricks that aren't empty.
-					const FInt3 BrickCoordinates(X,Y,Z);
-					const uint32 BrickMaterial = Grid->GetBrick(BrickCoordinates);
+					const uint32 LocalIndex = (LocalY * AdjacentBricksDim.X + LocalX) * AdjacentBricksDim.Z + LocalZ;
+					const uint8 BrickMaterial = BrickMaterials[LocalIndex];
 					if (BrickMaterial != EmptyMaterialIndex)
 					{
+						const FInt3 RelativeBrickCoordinates(LocalX - 1,LocalY - 1,LocalZ - 1);
 						for(uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
 						{
 							// Only draw faces that face empty bricks.
-							const FInt3 FrontBrickXYZ = BrickCoordinates + FaceNormals[FaceIndex];
-							if (Grid->GetBrick(FrontBrickXYZ) == EmptyMaterialIndex)
+							const int32 FacingLocalX = LocalX + FaceNormals[FaceIndex].X;
+							const int32 FacingLocalY = LocalY + FaceNormals[FaceIndex].Y;
+							const int32 FacingLocalZ = LocalZ + FaceNormals[FaceIndex].Z;
+							const uint32 FacingLocalIndex = (FacingLocalY * AdjacentBricksDim.X + FacingLocalX) * AdjacentBricksDim.Z + FacingLocalZ;
+							const uint32 FrontBrickMaterial = BrickMaterials[FacingLocalIndex];
+							if(FrontBrickMaterial == EmptyMaterialIndex)
 							{
 								// Write the vertices for the brick face.
 								const int32 BaseFaceVertexIndex = VertexBuffer.Vertices.AddUninitialized(4);
 								FBrickVertex* FaceVertex = &VertexBuffer.Vertices[BaseFaceVertexIndex];
-								const FInt3 RelativeBrickCoordinates = BrickCoordinates - MinBrickCoordinates;
 								for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex, ++FaceVertex)
 								{
-									const FInt3 Position = RelativeBrickCoordinates + GetCornerVertexOffset(FaceVertices[FaceIndex][FaceVertexIndex]);
+									const FInt3 CornerVertexOffset = GetCornerVertexOffset(FaceVertices[FaceIndex][FaceVertexIndex]);
+									const FInt3 Position = RelativeBrickCoordinates + CornerVertexOffset;
 									FaceVertex->X = Position.X;
 									FaceVertex->Y = Position.Y;
 									FaceVertex->Z = Position.Z;
+									FaceVertex->AmbientOcclusionFactor = VertexAmbientFactors[(Position.Y * VertexDim.X + Position.X) * VertexDim.Z + Position.Z];
 								}
 
 								// Write the indices for the brick face.
