@@ -41,11 +41,8 @@ struct FBrick
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = Bricks)
 	int32 MaterialIndex;
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = Bricks)
-	uint8 AmbientOcclusionFactor;
-
 	FBrick() {}
-	FBrick(int32 InMaterialIndex,uint8 InAmbientOcclusionFactor) : MaterialIndex(InMaterialIndex), AmbientOcclusionFactor(InAmbientOcclusionFactor) {}
+	FBrick(int32 InMaterialIndex) : MaterialIndex(InMaterialIndex) {}
 };
 
 /** A 3D integer vector. */
@@ -71,6 +68,7 @@ struct FInt3
 
 	operator FIntVector() const { return FIntVector(X,Y,Z); }
 	FVector ToFloat() const { return FVector(X,Y,Z); }
+	int32 SumComponents() const { return X + Y + Z; }
 
 	friend uint32 GetTypeHash(const FInt3& Coordinates)
 	{
@@ -151,15 +149,6 @@ struct FBrickRegion
 	// Contains the material index for each brick, stored in an 8-bit integer.
 	UPROPERTY()
 	TArray<uint8> BrickContents;
-
-	// Contains an ambient occlusion factor for each brick, stored as 8-bit number where 255=1.0.
-	UPROPERTY(Transient)
-	TArray<uint8> BrickAmbientOcclusion;
-
-	UPROPERTY(Transient)
-	bool HasAmbientOcclusionFactors;
-
-	FBrickRegion(): HasAmbientOcclusionFactors() {}
 };
 
 /** The parameters for a BrickGridComponent. */
@@ -253,10 +242,6 @@ public:
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API void InvalidateChunkComponents(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates);
 
-	// Ensures that ambient occlusion is up-to-date for a range of brick coordinates.
-	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API void UpdateAO(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates);
-
 	// Updates the visible chunks for a given view position.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API void Update(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion InitRegion);
@@ -326,9 +311,6 @@ private:
 
 	// Creates a region for the given coordinates.
 	void CreateRegion(const FInt3& Coordinates,FBrickGrid_InitRegion OnInitRegion);
-
-	// Updates the ambient occlusion for a region.
-	void UpdateRegionAO(const FInt3& RegionCoordinates);
 
 	// Maps brick coordinates within a region to a brick index.
 	inline uint32 SubregionBrickCoordinatesToRegionBrickIndex(const FInt3 SubregionBrickCoordinates) const

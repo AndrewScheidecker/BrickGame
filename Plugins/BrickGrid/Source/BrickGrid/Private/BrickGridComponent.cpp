@@ -84,10 +84,10 @@ FBrick UBrickGridComponent::GetBrick(const FInt3& BrickCoordinates) const
 		{
 			const uint32 BrickIndex = BrickCoordinatesToRegionBrickIndex(RegionCoordinates,BrickCoordinates);
 			const FBrickRegion& Region = Regions[*RegionIndex];
-			return FBrick(Region.BrickContents[BrickIndex],Region.HasAmbientOcclusionFactors ? Region.BrickAmbientOcclusion[BrickIndex] : 255);
+			return FBrick(Region.BrickContents[BrickIndex]);
 		}
 	}
-	return FBrick(Parameters.EmptyMaterialIndex,255);
+	return FBrick(Parameters.EmptyMaterialIndex);
 }
 
 bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 MaterialIndex)
@@ -122,34 +122,17 @@ void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinBrickCoordin
 	// Expand the brick box by 1 brick so that bricks facing the one being invalidated are also updated.
 	const FInt3 FacingExpansionExtent = FInt3::Scalar(1);
 
-	// Invalidate ambient occlusion.
-	const FInt3 AmbientOcclusionExpansionExtent = FInt3::Scalar(Parameters.AmbientOcclusionBlurRadius);
-	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates - AmbientOcclusionExpansionExtent);
-	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(MaxBrickCoordinates + AmbientOcclusionExpansionExtent);
-	for(int32 RegionX = MinRegionCoordinates.X;RegionX <= MaxRegionCoordinates.X;++RegionX)
-	{
-		for(int32 RegionY = MinRegionCoordinates.Y;RegionY <= MaxRegionCoordinates.Y;++RegionY)
-		{
-			for(int32 RegionZ = MinRegionCoordinates.Z;RegionZ <= MaxRegionCoordinates.Z;++RegionZ)
-			{
-				int32* RegionIndex = RegionCoordinatesToIndex.Find(FInt3(RegionX,RegionY,RegionZ));
-				if(RegionIndex)
-				{
-					Regions[*RegionIndex].HasAmbientOcclusionFactors = false;
-				}
-			}
-		}
-	}
-
 	// Invalidate render components. Note that because of ambient occlusion, the render chunks need to be invalidated all the way to the bottom of the grid!
+	const FInt3 AmbientOcclusionExpansionExtent = FInt3::Scalar(Parameters.AmbientOcclusionBlurRadius);
 	const FInt3 RenderExpansionExtent = AmbientOcclusionExpansionExtent + FacingExpansionExtent;
-	const FInt3 MinRenderChunkCoordinates = BrickToRenderChunkCoordinates(this->MinBrickCoordinates);
+	const FInt3 MinRenderChunkCoordinates = BrickToRenderChunkCoordinates(MinBrickCoordinates - RenderExpansionExtent);
 	const FInt3 MaxRenderChunkCoordinates = BrickToRenderChunkCoordinates(MaxBrickCoordinates + RenderExpansionExtent);
+	const FInt3 MinAmbientOcclusionCoordinates = FInt3(MinRenderChunkCoordinates.X,MinRenderChunkCoordinates.Y,UBrickGridComponent::MinBrickCoordinates.Z);
 	for(int32 ChunkX = MinRenderChunkCoordinates.X;ChunkX <= MaxRenderChunkCoordinates.X;++ChunkX)
 	{
 		for(int32 ChunkY = MinRenderChunkCoordinates.Y;ChunkY <= MaxRenderChunkCoordinates.Y;++ChunkY)
 		{
-			for(int32 ChunkZ = MinRenderChunkCoordinates.Z;ChunkZ <= MaxRenderChunkCoordinates.Z;++ChunkZ)
+			for(int32 ChunkZ = MinAmbientOcclusionCoordinates.Z;ChunkZ <= MaxRenderChunkCoordinates.Z;++ChunkZ)
 			{
 				UBrickRenderComponent* RenderComponent = RenderChunkCoordinatesToComponent.FindRef(FInt3(ChunkX,ChunkY,ChunkZ));
 				if(RenderComponent)
@@ -210,7 +193,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 						Region.Coordinates = RegionCoordinates;
 
 						// Initialize the region's bricks to the empty material.
-						Region.BrickContents.Init(Parameters.EmptyMaterialIndex, 1 << (Parameters.BricksPerRegionLog2.X + Parameters.BricksPerRegionLog2.Y + Parameters.BricksPerRegionLog2.Z));
+						Region.BrickContents.Init(Parameters.EmptyMaterialIndex, 1 << Parameters.BricksPerRegionLog2.SumComponents());
 
 						// Add the region to the coordinate map.
 						RegionCoordinatesToIndex.Add(RegionCoordinates,RegionIndex);
