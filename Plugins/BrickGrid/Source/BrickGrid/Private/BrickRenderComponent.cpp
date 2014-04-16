@@ -309,22 +309,23 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 	const FInt3 LocalBrickExpansion(Grid->Parameters.AmbientOcclusionBlurRadius + 1,Grid->Parameters.AmbientOcclusionBlurRadius + 1,1);
 	const FInt3 MinLocalBrickCoordinates = MinBrickCoordinates - LocalBrickExpansion;
 
-	// Read the brick materials and ambient occlusion for this chunk and adjacent bricks.
+	// Read the brick materials for all the bricks that affect this chunk.
 	const FInt3 LocalBricksDim = Grid->BricksPerRenderChunk + LocalBrickExpansion * FInt3::Scalar(2);
 	TArray<uint8> LocalBrickMaterials;
 	LocalBrickMaterials.Init(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
+	Grid->GetBrickMaterialArray(MinLocalBrickCoordinates,MinLocalBrickCoordinates + LocalBricksDim - FInt3::Scalar(1),LocalBrickMaterials);
+
+	// Check whether there are any non-empty bricks in this chunk.
 	bool HasNonEmptyBrick = false;
 	const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
-	for(int32 LocalBrickY = 0; LocalBrickY < LocalBricksDim.Y; ++LocalBrickY)
+	for(int32 LocalBrickY = LocalBrickExpansion.Y; LocalBrickY < Grid->BricksPerRenderChunk.Y + LocalBrickExpansion.Y && !HasNonEmptyBrick; ++LocalBrickY)
 	{
-		for(int32 LocalBrickX = 0; LocalBrickX < LocalBricksDim.X; ++LocalBrickX)
+		for(int32 LocalBrickX = LocalBrickExpansion.X; LocalBrickX < Grid->BricksPerRenderChunk.X + LocalBrickExpansion.X && !HasNonEmptyBrick; ++LocalBrickX)
 		{
-			for(int32 LocalBrickZ = 0; LocalBrickZ < LocalBricksDim.Z; ++LocalBrickZ)
+			for(int32 LocalBrickZ = LocalBrickExpansion.Z; LocalBrickZ < Grid->BricksPerRenderChunk.Z + LocalBrickExpansion.Z && !HasNonEmptyBrick; ++LocalBrickZ)
 			{
-				const FBrick Brick = Grid->GetBrick(MinLocalBrickCoordinates + FInt3(LocalBrickX,LocalBrickY,LocalBrickZ));
 				const uint32 LocalBrickIndex = (LocalBrickY * LocalBricksDim.X + LocalBrickX) * LocalBricksDim.Z + LocalBrickZ;
-				LocalBrickMaterials[LocalBrickIndex] = Brick.MaterialIndex;
-				if(Brick.MaterialIndex != EmptyMaterialIndex)
+				if(LocalBrickMaterials[LocalBrickIndex] != EmptyMaterialIndex)
 				{
 					HasNonEmptyBrick = true;
 				}

@@ -94,6 +94,47 @@ FBrick UBrickGridComponent::GetBrick(const FInt3& BrickCoordinates) const
 	return FBrick(Parameters.EmptyMaterialIndex);
 }
 
+void UBrickGridComponent::GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint8>& OutBrickMaterials) const
+{
+	const FInt3 OutputSize = MaxBrickCoordinates - MinBrickCoordinates + FInt3::Scalar(1);
+	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
+	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(MaxBrickCoordinates);
+	for(int32 RegionY = MinRegionCoordinates.Y;RegionY <= MaxRegionCoordinates.Y;++RegionY)
+	{
+		for(int32 RegionX = MinRegionCoordinates.X;RegionX <= MaxRegionCoordinates.X;++RegionX)
+		{
+			for(int32 RegionZ = MinRegionCoordinates.Z;RegionZ <= MaxRegionCoordinates.Z;++RegionZ)
+			{
+				const FInt3 RegionCoordinates(RegionX,RegionY,RegionZ);
+				const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
+				const FInt3 MinRegionBrickCoordinates = FInt3(RegionX,RegionY,RegionZ) * BricksPerRegion;
+				const FInt3 MinOutputRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),MinBrickCoordinates - MinRegionBrickCoordinates);
+				const FInt3 MaxOutputRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),MaxBrickCoordinates - MinRegionBrickCoordinates);
+				for(int32 RegionBrickY = MinOutputRegionBrickCoordinates.Y;RegionBrickY <= MaxOutputRegionBrickCoordinates.Y;++RegionBrickY)
+				{
+					for(int32 RegionBrickX = MinOutputRegionBrickCoordinates.X;RegionBrickX <= MaxOutputRegionBrickCoordinates.X;++RegionBrickX)
+					{
+						const int32 OutputX = MinRegionBrickCoordinates.X + RegionBrickX - MinBrickCoordinates.X;
+						const int32 OutputY = MinRegionBrickCoordinates.Y + RegionBrickY - MinBrickCoordinates.Y;
+						const int32 OutputMinZ = MinRegionBrickCoordinates.Z + MinOutputRegionBrickCoordinates.Z - MinBrickCoordinates.Z;
+						const int32 OutputSizeZ = MaxOutputRegionBrickCoordinates.Z - MinOutputRegionBrickCoordinates.Z + 1;
+						const uint32 OutputBaseBrickIndex = (OutputY * OutputSize.X + OutputX) * OutputSize.Z + OutputMinZ;
+						const uint32 RegionBaseBrickIndex = (((RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX) << Parameters.BricksPerRegionLog2.Z) + MinOutputRegionBrickCoordinates.Z;
+						if(RegionIndex)
+						{
+							FMemory::Memcpy(&OutBrickMaterials[OutputBaseBrickIndex],&Regions[*RegionIndex].BrickContents[RegionBaseBrickIndex],OutputSizeZ * sizeof(uint8));
+						}
+						else
+						{
+							FMemory::Memset(&OutBrickMaterials[OutputBaseBrickIndex],Parameters.EmptyMaterialIndex,OutputSizeZ * sizeof(uint8));
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 MaterialIndex)
 {
 	if(SetBrickWithoutInvalidatingComponents(BrickCoordinates,MaterialIndex))

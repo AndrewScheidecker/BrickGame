@@ -58,26 +58,37 @@ void UBrickCollisionComponent::UpdateCollisionBody()
 
 	CollisionBodySetup->AggGeom.BoxElems.Reset();
 
-	// Iterate over each brick in the chunk.
 	const FInt3 MinBrickCoordinates = Coordinates << Grid->BricksPerCollisionChunkLog2;
-	const FInt3 MaxBrickCoordinatesPlus1 = MinBrickCoordinates + Grid->BricksPerCollisionChunk + FInt3::Scalar(1);
+	const FInt3 MaxBrickCoordinates = MinBrickCoordinates + Grid->BricksPerCollisionChunk - FInt3::Scalar(1);
+	const FInt3 LocalBrickExpansion = FInt3::Scalar(1);
+	const FInt3 MinLocalBrickCoordinates = MinBrickCoordinates - LocalBrickExpansion;
+
+	// Read the brick materials for all the bricks that affect this chunk.
+	const FInt3 LocalBricksDim = Grid->BricksPerCollisionChunk + LocalBrickExpansion * FInt3::Scalar(2);
+	TArray<uint8> LocalBrickMaterials;
+	LocalBrickMaterials.Init(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
+	Grid->GetBrickMaterialArray(MinLocalBrickCoordinates,MinLocalBrickCoordinates + LocalBricksDim - FInt3::Scalar(1),LocalBrickMaterials);
+
+	// Iterate over each brick in the chunk.
 	const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
-	for(int32 Y = MinBrickCoordinates.Y; Y < MaxBrickCoordinatesPlus1.Y; ++Y)
+	for(int32 Y = MinBrickCoordinates.Y; Y <= MaxBrickCoordinates.Y; ++Y)
 	{
-		for(int32 X = MinBrickCoordinates.X; X < MaxBrickCoordinatesPlus1.X; ++X)
+		for(int32 X = MinBrickCoordinates.X; X <= MaxBrickCoordinates.X; ++X)
 		{
-			for(int32 Z = MinBrickCoordinates.Z; Z < MaxBrickCoordinatesPlus1.Z; ++Z)
+			for(int32 Z = MinBrickCoordinates.Z; Z <= MaxBrickCoordinates.Z; ++Z)
 			{
-				// Only create collision boxes for bricks that aren't empty.
 				const FInt3 BrickCoordinates(X,Y,Z);
-				const int32 BrickMaterial = Grid->GetBrick(BrickCoordinates).MaterialIndex;
+				const FInt3 LocalBrickCoordinates = BrickCoordinates - MinLocalBrickCoordinates;
+				// Only create collision boxes for bricks that aren't empty.
+				const int32 BrickMaterial = LocalBrickMaterials[(LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z];
 				if (BrickMaterial != EmptyMaterialIndex)
 				{
 					// Only create collision boxes for bricks that are adjacent to an empty brick.
 					bool HasEmptyNeighbor = false;
 					for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 					{
-						if(Grid->GetBrick(BrickCoordinates + FaceNormals[FaceIndex]).MaterialIndex == EmptyMaterialIndex)
+						const FInt3 FacingLocalBrickCoordinates = LocalBrickCoordinates + FaceNormals[FaceIndex];
+						if(LocalBrickMaterials[(FacingLocalBrickCoordinates.Y * LocalBricksDim.X + FacingLocalBrickCoordinates.X) * LocalBricksDim.Z + FacingLocalBrickCoordinates.Z] == EmptyMaterialIndex)
 						{
 							HasEmptyNeighbor = true;
 							break;

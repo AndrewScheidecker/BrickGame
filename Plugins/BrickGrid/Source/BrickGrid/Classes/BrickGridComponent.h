@@ -233,6 +233,8 @@ public:
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API FBrick GetBrick(const FInt3& BrickCoordinates) const;
 
+	BRICKGRID_API void GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint8>& OutBrickMaterials) const;
+
 	// Returns a height-map containing the non-empty brick with greatest Z for each XY in the rectangle bounded by MinBrickCoordinates.XY-MaxBrickCoordinates.XY.
 	// The returned heights are relative to MinBrickCoordinates.Z, but MaxBrickCoordinates.Z is ignored.
 	// OutHeightmap should be allocated by the caller to contain an int8 for each XY in the rectangle, and is indexed by OutHeightMap[Y * SizeX + X].
