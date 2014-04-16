@@ -29,7 +29,10 @@ struct FBrickMaterial
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = Bricks)
 	class UMaterialInterface* SurfaceMaterial;
 
-	FBrickMaterial() : SurfaceMaterial(NULL) {}
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = Bricks)
+	class UMaterialInterface* OverrideTopSurfaceMaterial;
+
+	FBrickMaterial() : SurfaceMaterial(NULL), OverrideTopSurfaceMaterial(NULL) {}
 };
 
 /** Information about a brick. */

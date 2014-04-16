@@ -170,19 +170,7 @@ public:
 
 	FBrickChunkSceneProxy(UBrickRenderComponent* Component)
 	: FPrimitiveSceneProxy(Component)
-	{
-		// Copy the materials.
-		for(int32 MaterialIndex = 0; MaterialIndex < Component->GetNumMaterials(); ++MaterialIndex)
-		{
-			UMaterialInterface* Material = Component->GetMaterial(MaterialIndex);
-			if (Material == NULL)
-			{
-				Material = UMaterial::GetDefaultMaterial(MD_Surface);
-			}
-			MaterialRelevance |= Material->GetRelevance_Concurrent();
-			Materials.Add(Material);
-		}
-	}
+	{}
 
 	void BeginInitResources()
 	{
@@ -398,25 +386,40 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 		// Create mesh elements for each batch.
 		int32 NumIndices = 0;
-		for(int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
+		for(int32 BrickMaterialIndex = 0; BrickMaterialIndex < MaterialBatches.Num(); ++BrickMaterialIndex)
 		{
 			for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 			{
-				NumIndices += MaterialBatches[MaterialIndex].FaceBatches[FaceIndex].Indices.Num();
+				NumIndices += MaterialBatches[BrickMaterialIndex].FaceBatches[FaceIndex].Indices.Num();
 			}
 		}
 		SceneProxy->IndexBuffer.Indices.Empty(NumIndices);
-		for(int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
+		for(int32 BrickMaterialIndex = 0; BrickMaterialIndex < MaterialBatches.Num(); ++BrickMaterialIndex)
 		{
+			UMaterialInterface* SurfaceMaterial = Grid->Parameters.Materials[BrickMaterialIndex].SurfaceMaterial;
+			if(SurfaceMaterial == NULL)
+			{
+				SurfaceMaterial = UMaterial::GetDefaultMaterial(MD_Surface);
+			}
+			SceneProxy->MaterialRelevance |= SurfaceMaterial->GetRelevance_Concurrent();
+			const int32 ProxyMaterialIndex = SceneProxy->Materials.Add(SurfaceMaterial);
+
+			UMaterialInterface* OverrideTopSurfaceMaterial = Grid->Parameters.Materials[BrickMaterialIndex].OverrideTopSurfaceMaterial;
+			if(OverrideTopSurfaceMaterial)
+			{
+				SceneProxy->MaterialRelevance |= OverrideTopSurfaceMaterial->GetRelevance_Concurrent();
+			}
+			const int32 TopProxyMaterialIndex = OverrideTopSurfaceMaterial ? SceneProxy->Materials.Add(OverrideTopSurfaceMaterial) : ProxyMaterialIndex;
+
 			for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 			{
-				const FFaceBatch& FaceBatch = MaterialBatches[MaterialIndex].FaceBatches[FaceIndex];
+				const FFaceBatch& FaceBatch = MaterialBatches[BrickMaterialIndex].FaceBatches[FaceIndex];
 				if (FaceBatch.Indices.Num() > 0)
 				{
 					FBrickChunkSceneProxy::FElement& Element = *new(SceneProxy->Elements)FBrickChunkSceneProxy::FElement;
 					Element.FirstIndex = SceneProxy->IndexBuffer.Indices.Num();
 					Element.NumPrimitives = FaceBatch.Indices.Num() / 3;
-					Element.MaterialIndex = MaterialIndex;
+					Element.MaterialIndex = FaceIndex == 5 ? TopProxyMaterialIndex : ProxyMaterialIndex;
 					Element.FaceIndex = FaceIndex;
 
 					// Append the batch's indices to the index buffer.
@@ -435,18 +438,6 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 	}
 
 	return SceneProxy;
-}
-
-int32 UBrickRenderComponent::GetNumMaterials() const
-{
-	return Grid->Parameters.Materials.Num();
-}
-
-class UMaterialInterface* UBrickRenderComponent::GetMaterial(int32 ElementIndex) const
-{
-	return Grid != NULL && ElementIndex >= 0 && ElementIndex < Grid->Parameters.Materials.Num() 
-		? Grid->Parameters.Materials[ElementIndex].SurfaceMaterial
-		: NULL;
 }
 
 FBoxSphereBounds UBrickRenderComponent::CalcBounds(const FTransform & LocalToWorld) const

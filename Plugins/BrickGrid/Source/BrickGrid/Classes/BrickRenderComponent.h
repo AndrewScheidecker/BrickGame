@@ -26,8 +26,6 @@ public:
 
 	// Begin UPrimitiveComponent interface.
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() OVERRIDE;
-	virtual int32 GetNumMaterials() const OVERRIDE;
-	virtual class UMaterialInterface* GetMaterial(int32 ElementIndex) const OVERRIDE;
 	// End UPrimitiveComponent interface.
 
 	// Begin USceneComponent interface.
