@@ -150,133 +150,27 @@ class FBrickChunkSceneProxy : public FPrimitiveSceneProxy
 {
 public:
 
+	FBrickChunkVertexBuffer VertexBuffer;
+	FBrickChunkIndexBuffer IndexBuffer;
+	FBrickChunkVertexFactory VertexFactories[6];
+
+	struct FElement
+	{
+		uint32 FirstIndex;
+		uint32 NumPrimitives;
+		uint32 MaterialIndex;
+		uint32 FaceIndex;
+	};
+	TArray<FElement> Elements;
+
+	TArray<UMaterialInterface*> Materials;
+	FMaterialRelevance MaterialRelevance;
+
+	TUniformBufferRef<FPrimitiveUniformShaderParameters> PrimitiveUniformBuffer;
+
 	FBrickChunkSceneProxy(UBrickRenderComponent* Component)
 	: FPrimitiveSceneProxy(Component)
 	{
-		const double StartTime = FPlatformTime::Seconds();
-
-		// Batch the faces by material and direction.
-		struct FFaceBatch
-		{
-			TArray<int16> Indices;
-		};
-		struct FMaterialBatch
-		{
-			FFaceBatch FaceBatches[6];
-		};
-		TArray<FMaterialBatch> MaterialBatches;
-		MaterialBatches.Init(FMaterialBatch(),Component->Grid->Parameters.Materials.Num());
-
-		const UBrickGridComponent* Grid = Component->Grid;
-		const FInt3 MinBrickCoordinates = Component->Coordinates << Grid->BricksPerRenderChunkLog2;
-		const FInt3 LocalBrickExpansion(Grid->Parameters.AmbientOcclusionBlurRadius + 1,Grid->Parameters.AmbientOcclusionBlurRadius + 1,1);
-		const FInt3 MinLocalBrickCoordinates = MinBrickCoordinates - LocalBrickExpansion;
-
-		// Read the brick materials and ambient occlusion for this chunk and adjacent bricks.
-		const FInt3 LocalBricksDim = Grid->BricksPerRenderChunk + LocalBrickExpansion * FInt3::Scalar(2);
-		TArray<uint8> LocalBrickMaterials;
-		LocalBrickMaterials.Init(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
-		for(int32 LocalBrickY = 0; LocalBrickY < LocalBricksDim.Y; ++LocalBrickY)
-		{
-			for(int32 LocalBrickX = 0; LocalBrickX < LocalBricksDim.X; ++LocalBrickX)
-			{
-				for(int32 LocalBrickZ = 0; LocalBrickZ < LocalBricksDim.Z; ++LocalBrickZ)
-				{
-					const FBrick Brick = Grid->GetBrick(MinLocalBrickCoordinates + FInt3(LocalBrickX,LocalBrickY,LocalBrickZ));
-					const uint32 LocalBrickIndex = (LocalBrickY * LocalBricksDim.X + LocalBrickX) * LocalBricksDim.Z + LocalBrickZ;
-					LocalBrickMaterials[LocalBrickIndex] = Brick.MaterialIndex;
-				}
-			}
-		}
-
-		// Compute the ambient occlusion for the vertices in this chunk.
-		const FInt3 LocalVertexDim = Grid->BricksPerRenderChunk + FInt3::Scalar(1);
-		TArray<uint8> LocalVertexAmbientFactors;
-		LocalVertexAmbientFactors.Init(LocalVertexDim.X * LocalVertexDim.Y * LocalVertexDim.Z);
-		ComputeChunkAO(Grid,MinLocalBrickCoordinates,LocalBrickExpansion,LocalBricksDim,LocalVertexDim,LocalBrickMaterials,LocalVertexAmbientFactors);
-
-		// Iterate over each brick in the chunk.
-		const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
-		for(int32 LocalBrickY = LocalBrickExpansion.Y; LocalBrickY < Grid->BricksPerRenderChunk.Y + LocalBrickExpansion.Y; ++LocalBrickY)
-		{
-			for(int32 LocalBrickX = LocalBrickExpansion.X; LocalBrickX < Grid->BricksPerRenderChunk.X + LocalBrickExpansion.X; ++LocalBrickX)
-			{
-				for(int32 LocalBrickZ = LocalBrickExpansion.Z; LocalBrickZ < Grid->BricksPerRenderChunk.Z + LocalBrickExpansion.Z; ++LocalBrickZ)
-				{
-					// Only draw faces of bricks that aren't empty.
-					const uint32 LocalBrickIndex = (LocalBrickY * LocalBricksDim.X + LocalBrickX) * LocalBricksDim.Z + LocalBrickZ;
-					const uint8 BrickMaterial = LocalBrickMaterials[LocalBrickIndex];
-					if (BrickMaterial != EmptyMaterialIndex)
-					{
-						const FInt3 RelativeBrickCoordinates = FInt3(LocalBrickX,LocalBrickY,LocalBrickZ) - LocalBrickExpansion;
-						for(uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
-						{
-							// Only draw faces that face empty bricks.
-							const int32 FacingLocalBrickX = LocalBrickX + FaceNormals[FaceIndex].X;
-							const int32 FacingLocalBrickY = LocalBrickY + FaceNormals[FaceIndex].Y;
-							const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
-							const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
-							const uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
-							if(FrontBrickMaterial == EmptyMaterialIndex)
-							{
-								// Write the vertices for the brick face.
-								const int32 BaseFaceVertexIndex = VertexBuffer.Vertices.AddUninitialized(4);
-								FBrickVertex* FaceVertex = &VertexBuffer.Vertices[BaseFaceVertexIndex];
-								for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex, ++FaceVertex)
-								{
-									const FInt3 CornerVertexOffset = GetCornerVertexOffset(FaceVertices[FaceIndex][FaceVertexIndex]);
-									const FInt3 Position = RelativeBrickCoordinates + CornerVertexOffset;
-									FaceVertex->X = Position.X;
-									FaceVertex->Y = Position.Y;
-									FaceVertex->Z = Position.Z;
-									FaceVertex->AmbientOcclusionFactor = LocalVertexAmbientFactors[(Position.Y * LocalVertexDim.X + Position.X) * LocalVertexDim.Z + Position.Z];
-								}
-
-								// Write the indices for the brick face.
-								FFaceBatch& FaceBatch = MaterialBatches[BrickMaterial].FaceBatches[FaceIndex];
-								int16* FaceVertexIndex = &FaceBatch.Indices[FaceBatch.Indices.AddUninitialized(6)];
-								*FaceVertexIndex++ = BaseFaceVertexIndex + 0;
-								*FaceVertexIndex++ = BaseFaceVertexIndex + 1;
-								*FaceVertexIndex++ = BaseFaceVertexIndex + 2;
-								*FaceVertexIndex++ = BaseFaceVertexIndex + 0;
-								*FaceVertexIndex++ = BaseFaceVertexIndex + 2;
-								*FaceVertexIndex++ = BaseFaceVertexIndex + 3;
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Create mesh elements for each batch.
-		int32 NumIndices = 0;
-		for(int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
-		{
-			for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
-			{
-				NumIndices += MaterialBatches[MaterialIndex].FaceBatches[FaceIndex].Indices.Num();
-			}
-		}
-		IndexBuffer.Indices.Empty(NumIndices);
-		for(int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
-		{
-			for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
-			{
-				const FFaceBatch& FaceBatch = MaterialBatches[MaterialIndex].FaceBatches[FaceIndex];
-				if (FaceBatch.Indices.Num() > 0)
-				{
-					FElement& Element = *new(Elements)FElement;
-					Element.FirstIndex = IndexBuffer.Indices.Num();
-					Element.NumPrimitives = FaceBatch.Indices.Num() / 3;
-					Element.MaterialIndex = MaterialIndex;
-					Element.FaceIndex = FaceIndex;
-
-					// Append the batch's indices to the index buffer.
-					IndexBuffer.Indices.Append(FaceBatch.Indices);
-				}
-			}
-		}
-
 		// Copy the materials.
 		for(int32 MaterialIndex = 0; MaterialIndex < Component->GetNumMaterials(); ++MaterialIndex)
 		{
@@ -288,7 +182,10 @@ public:
 			MaterialRelevance |= Material->GetRelevance_Concurrent();
 			Materials.Add(Material);
 		}
+	}
 
+	void BeginInitResources()
+	{
 		// Enqueue initialization of render resource
 		BeginInitResource(&VertexBuffer);
 		BeginInitResource(&IndexBuffer);
@@ -297,8 +194,6 @@ public:
 			VertexFactories[FaceIndex].Init(VertexBuffer,FaceIndex);
 			BeginInitResource(&VertexFactories[FaceIndex]);
 		}
-
-		UE_LOG(LogStats,Log,TEXT("FBrickChunkSceneProxy constructor took %fms to create %u indices and %u vertices"),1000.0f * float(FPlatformTime::Seconds() - StartTime),IndexBuffer.Indices.Num(),VertexBuffer.Vertices.Num());
 	}
 
 	virtual ~FBrickChunkSceneProxy()
@@ -359,26 +254,6 @@ public:
 	virtual uint32 GetMemoryFootprint(void) const { return(sizeof(*this) + GetAllocatedSize()); }
 	uint32 GetAllocatedSize( void ) const { return( FPrimitiveSceneProxy::GetAllocatedSize() ); }
 
-private:
-
-	FBrickChunkVertexBuffer VertexBuffer;
-	FBrickChunkIndexBuffer IndexBuffer;
-	FBrickChunkVertexFactory VertexFactories[6];
-
-	struct FElement
-	{
-		uint32 FirstIndex;
-		uint32 NumPrimitives;
-		uint32 MaterialIndex;
-		uint32 FaceIndex;
-	};
-	TArray<FElement> Elements;
-
-	TArray<UMaterialInterface*> Materials;
-	FMaterialRelevance MaterialRelevance;
-
-	TUniformBufferRef<FPrimitiveUniformShaderParameters> PrimitiveUniformBuffer;
-
 	FMeshBatch GetMeshBatch(int32 ElementIndex,FMaterialRenderProxy* WireframeMaterialFace)
 	{
 		const FElement& Element = Elements[ElementIndex];
@@ -414,8 +289,151 @@ UBrickRenderComponent::UBrickRenderComponent( const FPostConstructInitializeProp
 
 FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 {
+	const double StartTime = FPlatformTime::Seconds();
+
 	HasLowPriorityUpdatePending = false;
-	return new FBrickChunkSceneProxy(this);
+
+	// Batch the faces by material and direction.
+	struct FFaceBatch
+	{
+		TArray<int16> Indices;
+	};
+	struct FMaterialBatch
+	{
+		FFaceBatch FaceBatches[6];
+	};
+	TArray<FMaterialBatch> MaterialBatches;
+	MaterialBatches.Init(FMaterialBatch(),Grid->Parameters.Materials.Num());
+
+	const FInt3 MinBrickCoordinates = Coordinates << Grid->BricksPerRenderChunkLog2;
+	const FInt3 LocalBrickExpansion(Grid->Parameters.AmbientOcclusionBlurRadius + 1,Grid->Parameters.AmbientOcclusionBlurRadius + 1,1);
+	const FInt3 MinLocalBrickCoordinates = MinBrickCoordinates - LocalBrickExpansion;
+
+	// Read the brick materials and ambient occlusion for this chunk and adjacent bricks.
+	const FInt3 LocalBricksDim = Grid->BricksPerRenderChunk + LocalBrickExpansion * FInt3::Scalar(2);
+	TArray<uint8> LocalBrickMaterials;
+	LocalBrickMaterials.Init(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
+	bool HasNonEmptyBrick = false;
+	const int32 EmptyMaterialIndex = Grid->Parameters.EmptyMaterialIndex;
+	for(int32 LocalBrickY = 0; LocalBrickY < LocalBricksDim.Y; ++LocalBrickY)
+	{
+		for(int32 LocalBrickX = 0; LocalBrickX < LocalBricksDim.X; ++LocalBrickX)
+		{
+			for(int32 LocalBrickZ = 0; LocalBrickZ < LocalBricksDim.Z; ++LocalBrickZ)
+			{
+				const FBrick Brick = Grid->GetBrick(MinLocalBrickCoordinates + FInt3(LocalBrickX,LocalBrickY,LocalBrickZ));
+				const uint32 LocalBrickIndex = (LocalBrickY * LocalBricksDim.X + LocalBrickX) * LocalBricksDim.Z + LocalBrickZ;
+				LocalBrickMaterials[LocalBrickIndex] = Brick.MaterialIndex;
+				if(Brick.MaterialIndex != EmptyMaterialIndex)
+				{
+					HasNonEmptyBrick = true;
+				}
+			}
+		}
+	}
+
+	// Only create a scene proxy if there are some non-empty bricks in the chunk.
+	FBrickChunkSceneProxy* SceneProxy = NULL;
+	if(HasNonEmptyBrick)
+	{
+		// Compute the ambient occlusion for the vertices in this chunk.
+		const FInt3 LocalVertexDim = Grid->BricksPerRenderChunk + FInt3::Scalar(1);
+		TArray<uint8> LocalVertexAmbientFactors;
+		LocalVertexAmbientFactors.Init(LocalVertexDim.X * LocalVertexDim.Y * LocalVertexDim.Z);
+		ComputeChunkAO(Grid,MinLocalBrickCoordinates,LocalBrickExpansion,LocalBricksDim,LocalVertexDim,LocalBrickMaterials,LocalVertexAmbientFactors);
+
+		// Iterate over each brick in the chunk.
+		SceneProxy = new FBrickChunkSceneProxy(this);
+		for(int32 LocalBrickY = LocalBrickExpansion.Y; LocalBrickY < Grid->BricksPerRenderChunk.Y + LocalBrickExpansion.Y; ++LocalBrickY)
+		{
+			for(int32 LocalBrickX = LocalBrickExpansion.X; LocalBrickX < Grid->BricksPerRenderChunk.X + LocalBrickExpansion.X; ++LocalBrickX)
+			{
+				for(int32 LocalBrickZ = LocalBrickExpansion.Z; LocalBrickZ < Grid->BricksPerRenderChunk.Z + LocalBrickExpansion.Z; ++LocalBrickZ)
+				{
+					// Only draw faces of bricks that aren't empty.
+					const uint32 LocalBrickIndex = (LocalBrickY * LocalBricksDim.X + LocalBrickX) * LocalBricksDim.Z + LocalBrickZ;
+					const uint8 BrickMaterial = LocalBrickMaterials[LocalBrickIndex];
+					if (BrickMaterial != EmptyMaterialIndex)
+					{
+						const FInt3 RelativeBrickCoordinates = FInt3(LocalBrickX,LocalBrickY,LocalBrickZ) - LocalBrickExpansion;
+						for(uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
+						{
+							// Only draw faces that face empty bricks.
+							const int32 FacingLocalBrickX = LocalBrickX + FaceNormals[FaceIndex].X;
+							const int32 FacingLocalBrickY = LocalBrickY + FaceNormals[FaceIndex].Y;
+							const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
+							const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
+							const uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
+							if(FrontBrickMaterial == EmptyMaterialIndex)
+							{
+								// Write the vertices for the brick face.
+								const int32 BaseFaceVertexIndex = SceneProxy->VertexBuffer.Vertices.AddUninitialized(4);
+								FBrickVertex* FaceVertex = &SceneProxy->VertexBuffer.Vertices[BaseFaceVertexIndex];
+								for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex, ++FaceVertex)
+								{
+									const FInt3 CornerVertexOffset = GetCornerVertexOffset(FaceVertices[FaceIndex][FaceVertexIndex]);
+									const FInt3 Position = RelativeBrickCoordinates + CornerVertexOffset;
+									FaceVertex->X = Position.X;
+									FaceVertex->Y = Position.Y;
+									FaceVertex->Z = Position.Z;
+									FaceVertex->AmbientOcclusionFactor = LocalVertexAmbientFactors[(Position.Y * LocalVertexDim.X + Position.X) * LocalVertexDim.Z + Position.Z];
+								}
+
+								// Write the indices for the brick face.
+								FFaceBatch& FaceBatch = MaterialBatches[BrickMaterial].FaceBatches[FaceIndex];
+								int16* FaceVertexIndex = &FaceBatch.Indices[FaceBatch.Indices.AddUninitialized(6)];
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 0;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 1;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 2;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 0;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 2;
+								*FaceVertexIndex++ = BaseFaceVertexIndex + 3;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Create mesh elements for each batch.
+		int32 NumIndices = 0;
+		for(int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
+		{
+			for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
+			{
+				NumIndices += MaterialBatches[MaterialIndex].FaceBatches[FaceIndex].Indices.Num();
+			}
+		}
+		SceneProxy->IndexBuffer.Indices.Empty(NumIndices);
+		for(int32 MaterialIndex = 0; MaterialIndex < MaterialBatches.Num(); ++MaterialIndex)
+		{
+			for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
+			{
+				const FFaceBatch& FaceBatch = MaterialBatches[MaterialIndex].FaceBatches[FaceIndex];
+				if (FaceBatch.Indices.Num() > 0)
+				{
+					FBrickChunkSceneProxy::FElement& Element = *new(SceneProxy->Elements)FBrickChunkSceneProxy::FElement;
+					Element.FirstIndex = SceneProxy->IndexBuffer.Indices.Num();
+					Element.NumPrimitives = FaceBatch.Indices.Num() / 3;
+					Element.MaterialIndex = MaterialIndex;
+					Element.FaceIndex = FaceIndex;
+
+					// Append the batch's indices to the index buffer.
+					SceneProxy->IndexBuffer.Indices.Append(FaceBatch.Indices);
+				}
+			}
+		}
+
+		SceneProxy->BeginInitResources();
+
+		UE_LOG(LogStats,Log,TEXT("UBrickRenderComponent::CreateSceneProxy took %fms to create %u indices and %u vertices"),1000.0f * float(FPlatformTime::Seconds() - StartTime),SceneProxy->IndexBuffer.Indices.Num(),SceneProxy->VertexBuffer.Vertices.Num());
+	}
+	else
+	{
+		UE_LOG(LogStats,Log,TEXT("UBrickRenderComponent::CreateSceneProxy took %fms to create empty chunk"),1000.0f * float(FPlatformTime::Seconds() - StartTime));
+	}
+
+	return SceneProxy;
 }
 
 int32 UBrickRenderComponent::GetNumMaterials() const
