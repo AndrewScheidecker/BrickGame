@@ -414,6 +414,7 @@ UBrickRenderComponent::UBrickRenderComponent( const FPostConstructInitializeProp
 
 FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 {
+	HasLowPriorityUpdatePending = false;
 	return new FBrickChunkSceneProxy(this);
 }
 

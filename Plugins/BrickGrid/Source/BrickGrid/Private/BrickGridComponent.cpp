@@ -238,7 +238,15 @@ void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinBrickCoordin
 				UBrickRenderComponent* RenderComponent = RenderChunkCoordinatesToComponent.FindRef(FInt3(ChunkX,ChunkY,ChunkZ));
 				if(RenderComponent)
 				{
-					RenderComponent->MarkRenderStateDirty();
+					if(ChunkZ >= MinRenderChunkCoordinates.Z)
+					{
+						RenderComponent->MarkRenderStateDirty();
+					}
+					else
+					{
+						// If the chunk only needs to be invalidate to update its ambient occlusion, defer it as a low priority update.
+						RenderComponent->HasLowPriorityUpdatePending = true;
+					}
 				}
 			}
 		}
@@ -327,6 +335,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 			ChunkIt.RemoveCurrent();
 		}
 	}
+	int32 NumLowPriorityRenderChunkUpdates = 0;
 	for(int32 ChunkZ = MinRenderChunkCoordinates.Z;ChunkZ <= MaxRenderChunkCoordinates.Z;++ChunkZ)
 	{
 		for(int32 ChunkY = MinRenderChunkCoordinates.Y;ChunkY <= MaxRenderChunkCoordinates.Y;++ChunkY)
@@ -337,20 +346,29 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 				const FBox ChunkBounds((ChunkCoordinates * BricksPerRenderChunk).ToFloat(),((ChunkCoordinates + FInt3::Scalar(1)) * BricksPerRenderChunk).ToFloat());
 				if(ChunkBounds.ComputeSquaredDistanceToPoint(LocalViewPosition) < FMath::Square(LocalMaxDrawDistance))
 				{
-					if(!RenderChunkCoordinatesToComponent.FindRef(ChunkCoordinates))
+					UBrickRenderComponent* RenderComponent = RenderChunkCoordinatesToComponent.FindRef(ChunkCoordinates);
+					if(!RenderComponent)
 					{
 						// Initialize a new chunk component.
-						UBrickRenderComponent* Chunk = ConstructObject<UBrickRenderComponent>(UBrickRenderComponent::StaticClass(), GetOwner());
-						Chunk->Grid = this;
-						Chunk->Coordinates = ChunkCoordinates;
+						RenderComponent = ConstructObject<UBrickRenderComponent>(UBrickRenderComponent::StaticClass(), GetOwner());
+						RenderComponent->Grid = this;
+						RenderComponent->Coordinates = ChunkCoordinates;
 
 						// Set the component transform and register it.
-						Chunk->SetRelativeLocation((ChunkCoordinates * BricksPerRenderChunk).ToFloat());
-						Chunk->AttachTo(this);
-						Chunk->RegisterComponent();
+						RenderComponent->SetRelativeLocation((ChunkCoordinates * BricksPerRenderChunk).ToFloat());
+						RenderComponent->AttachTo(this);
+						RenderComponent->RegisterComponent();
 
 						// Add the chunk to the coordinate map and visible chunk array.
-						RenderChunkCoordinatesToComponent.Add(ChunkCoordinates,Chunk);
+						RenderChunkCoordinatesToComponent.Add(ChunkCoordinates,RenderComponent);
+					}
+
+					// Flush low-priority pending updates to render components up to some per-frame limit.
+					if(RenderComponent->HasLowPriorityUpdatePending && NumLowPriorityRenderChunkUpdates < MaxRegionsToCreate)
+					{
+						RenderComponent->MarkRenderStateDirty();
+						RenderComponent->HasLowPriorityUpdatePending = false;
+						NumLowPriorityRenderChunkUpdates++;
 					}
 				}
 			}

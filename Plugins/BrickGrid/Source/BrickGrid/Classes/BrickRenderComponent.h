@@ -20,6 +20,10 @@ public:
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = Chunk)
 	class UBrickGridComponent* Grid;
 
+	// Whether this chunk has a low-priority update pending (e.g. ambient occlusion). These updates are spread over multiple frames.
+	UPROPERTY()
+	bool HasLowPriorityUpdatePending;
+
 	// Begin UPrimitiveComponent interface.
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() OVERRIDE;
 	virtual int32 GetNumMaterials() const OVERRIDE;
