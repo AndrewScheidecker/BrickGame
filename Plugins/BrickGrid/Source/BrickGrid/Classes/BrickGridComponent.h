@@ -149,6 +149,9 @@ struct FBrickRegion
 	// Contains the material index for each brick, stored in an 8-bit integer.
 	UPROPERTY()
 	TArray<uint8> BrickContents;
+
+	// Contains the occupied brick with highest Z in this region for each XY coordinate in the region. -1 means no non-empty bricks in this region at that XY.
+	TArray<int8> MaxNonEmptyBrickRegionZs;
 };
 
 /** The parameters for a BrickGridComponent. */
@@ -230,6 +233,11 @@ public:
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API FBrick GetBrick(const FInt3& BrickCoordinates) const;
 
+	// Returns a height-map containing the non-empty brick with greatest Z for each XY in the rectangle bounded by MinBrickCoordinates.XY-MaxBrickCoordinates.XY.
+	// The returned heights are relative to MinBrickCoordinates.Z, but MaxBrickCoordinates.Z is ignored.
+	// OutHeightmap should be allocated by the caller to contain an int8 for each XY in the rectangle, and is indexed by OutHeightMap[Y * SizeX + X].
+	BRICKGRID_API void GetMaxNonEmptyBrickZ(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<int8>& OutHeightMap) const;
+
 	// Writes the brick at the given coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API bool SetBrick(const FInt3& BrickCoordinates,int32 MaterialIndex);
@@ -289,13 +297,11 @@ public:
 	// UActorComponent interface.
 	virtual void OnRegister() OVERRIDE;
 	virtual void OnUnregister() OVERRIDE;
-	// UObject interface
-	virtual void PostLoad() OVERRIDE;
 
 private:
 
 	// All regions of the grid.
-	UPROPERTY()
+	UPROPERTY(Transient,DuplicateTransient)
 	TArray<struct FBrickRegion> Regions;
 
 	// Transient maps to help lookup regions and chunks by coordinates.
@@ -322,4 +328,7 @@ private:
 		return SubregionBrickCoordinatesToRegionBrickIndex(BrickCoordinates - (RegionCoordinates << Parameters.BricksPerRegionLog2));
 		
 	}
+
+	// Updates the non-empty height map for a single region.
+	void UpdateMaxNonEmptyBrickMap(FBrickRegion& Region,const FInt3 MinDirtyBrickCoordinates,const FInt3 MaxDirtyBrickCoordinates) const;
 };

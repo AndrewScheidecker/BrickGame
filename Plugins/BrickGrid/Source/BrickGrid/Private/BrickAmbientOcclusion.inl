@@ -19,23 +19,7 @@ static void ComputeChunkAO(
 	// For each XY in the chunk, find the highest non-empty brick between the bottom of the chunk and the top of the grid.
 	TArray<int8> MaxNonEmptyBrickLocalZs;
 	MaxNonEmptyBrickLocalZs.Init(LocalBricksDim.X * LocalBricksDim.Y);
-	for(int32 LocalBrickY = 0;LocalBrickY < LocalBricksDim.Y;++LocalBrickY)
-	{
-		for(int32 LocalBrickX = 0;LocalBrickX < LocalBricksDim.X;++LocalBrickX)
-		{
-			int32 MaxNonEmptyBrickZ = Grid->MaxBrickCoordinates.Z;
-			for(;MaxNonEmptyBrickZ >= MinLocalBrickCoordinates.Z;--MaxNonEmptyBrickZ)
-			{
-				const FInt3 BrickCoordinates(MinLocalBrickCoordinates.X + LocalBrickX,MinLocalBrickCoordinates.Y + LocalBrickY,MaxNonEmptyBrickZ);
-				const int32 BrickMaterialIndex = Grid->GetBrick(BrickCoordinates).MaterialIndex;
-				if(BrickMaterialIndex != Grid->Parameters.EmptyMaterialIndex)
-				{
-					break;
-				}
-			}
-			MaxNonEmptyBrickLocalZs[LocalBrickY * LocalBricksDim.X + LocalBrickX] = (int8)FMath::Min(127,MaxNonEmptyBrickZ - MinLocalBrickCoordinates.Z);
-		}
-	}
+	Grid->GetMaxNonEmptyBrickZ(MinLocalBrickCoordinates,MinLocalBrickCoordinates + LocalBricksDim - FInt3::Scalar(1),MaxNonEmptyBrickLocalZs);
 
 	// Allocate filtered ambient occlusion factors for each brick adjacent to the output vertices.
 	TArray<uint8> LocalBrickAmbientFactors;

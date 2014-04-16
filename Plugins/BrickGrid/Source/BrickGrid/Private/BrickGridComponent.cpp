@@ -67,9 +67,13 @@ void UBrickGridComponent::SetData(const FBrickGridData& Data)
 {
 	Init(Parameters);
 	Regions = Data.Regions;
-	// Recreate the region coordinate to index map.
-	for(auto RegionIt = Regions.CreateConstIterator();RegionIt;++RegionIt)
+
+	for(auto RegionIt = Regions.CreateIterator();RegionIt;++RegionIt)
 	{
+		// Compute the max non-empty brick map for the new regions.
+		UpdateMaxNonEmptyBrickMap(*RegionIt,FInt3::Scalar(0),BricksPerRegion - FInt3::Scalar(1));
+
+		// Recreate the region coordinate to index map.
 		RegionCoordinatesToIndex.Add(RegionIt->Coordinates,RegionIt.GetIndex());
 	}
 }
@@ -117,22 +121,119 @@ bool UBrickGridComponent::SetBrickWithoutInvalidatingComponents(const FInt3& Bri
 	return false;
 }
 
+void UBrickGridComponent::UpdateMaxNonEmptyBrickMap(FBrickRegion& Region,const FInt3 MinDirtyRegionBrickCoordinates,const FInt3 MaxDirtyRegionBrickCoordinates) const
+{
+	// Allocate the map.
+	if(!Region.MaxNonEmptyBrickRegionZs.Num())
+	{
+		Region.MaxNonEmptyBrickRegionZs.Init(1 << (Parameters.BricksPerRegionLog2.X + Parameters.BricksPerRegionLog2.Y));
+	}
+
+	// For each XY in the chunk, find the highest non-empty brick between the bottom of the chunk and the top of the grid.
+	for(int32 RegionBrickY = MinDirtyRegionBrickCoordinates.Y;RegionBrickY <= MaxDirtyRegionBrickCoordinates.Y;++RegionBrickY)
+	{
+		for(int32 RegionBrickX = MinDirtyRegionBrickCoordinates.X;RegionBrickX <= MaxDirtyRegionBrickCoordinates.X;++RegionBrickX)
+		{
+			int32 MaxNonEmptyRegionBrickZ = BricksPerRegion.Z - 1;
+			for(;MaxNonEmptyRegionBrickZ >= 0;--MaxNonEmptyRegionBrickZ)
+			{
+				const uint32 RegionBrickIndex = (((RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX) << Parameters.BricksPerRegionLog2.Z) + MaxNonEmptyRegionBrickZ;
+				if(Region.BrickContents[RegionBrickIndex] != Parameters.EmptyMaterialIndex)
+				{
+					break;
+				}
+			}
+			Region.MaxNonEmptyBrickRegionZs[(RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX] = (int8)MaxNonEmptyRegionBrickZ;
+		}
+	}
+}
+
+void UBrickGridComponent::GetMaxNonEmptyBrickZ(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<int8>& OutHeightMap) const
+{
+	const FInt3 OutputSize = MaxBrickCoordinates - MinBrickCoordinates + FInt3::Scalar(1);
+	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
+	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(MaxBrickCoordinates);
+	const FInt3 TopMaxRegionCoordinates = FInt3(MaxRegionCoordinates.X,MaxRegionCoordinates.Y,Parameters.MaxRegionCoordinates.Z);
+	for(int32 RegionY = MinRegionCoordinates.Y;RegionY <= TopMaxRegionCoordinates.Y;++RegionY)
+	{
+		for(int32 RegionX = MinRegionCoordinates.X;RegionX <= TopMaxRegionCoordinates.X;++RegionX)
+		{
+			TArray<const FBrickRegion*> ZRegions;
+			ZRegions.Empty(TopMaxRegionCoordinates.Z - MinRegionCoordinates.Z + 1);
+			for(int32 RegionZ = MinRegionCoordinates.Z;RegionZ <= TopMaxRegionCoordinates.Z;++RegionZ)
+			{
+				const FInt3 RegionCoordinates(RegionX,RegionY,RegionZ);
+				const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
+				if(RegionIndex)
+				{
+					ZRegions.Add(&Regions[*RegionIndex]);
+				}
+			}
+			const FInt3 MinRegionBrickCoordinates = FInt3(RegionX,RegionY,MinRegionCoordinates.Z) * BricksPerRegion;
+			const FInt3 MinOutputRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),MinBrickCoordinates - MinRegionBrickCoordinates);
+			const FInt3 MaxOutputRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),MaxBrickCoordinates - MinRegionBrickCoordinates);
+			for(int32 RegionBrickY = MinOutputRegionBrickCoordinates.Y;RegionBrickY <= MaxOutputRegionBrickCoordinates.Y;++RegionBrickY)
+			{
+				for(int32 RegionBrickX = MinOutputRegionBrickCoordinates.X;RegionBrickX <= MaxOutputRegionBrickCoordinates.X;++RegionBrickX)
+				{
+					int32 MaxNonEmptyBrickZ = UBrickGridComponent::MinBrickCoordinates.Z - 1;
+					for(int32 RegionZIndex = ZRegions.Num() - 1;RegionZIndex >= 0;--RegionZIndex)
+					{
+						const FBrickRegion& Region = *ZRegions[RegionZIndex];
+						const int8 RegionMaxNonEmptyZ = Region.MaxNonEmptyBrickRegionZs[(RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX];
+						if(RegionMaxNonEmptyZ != -1)
+						{
+							MaxNonEmptyBrickZ = Region.Coordinates.Z * BricksPerRegion.Z + (int32)RegionMaxNonEmptyZ;
+							break;
+						}
+					}
+
+					const int32 OutputX = MinRegionBrickCoordinates.X + RegionBrickX - MinBrickCoordinates.X;
+					const int32 OutputY = MinRegionBrickCoordinates.Y + RegionBrickY - MinBrickCoordinates.Y;
+					OutHeightMap[OutputY * OutputSize.X + OutputX] = (int8)FMath::Clamp(MaxNonEmptyBrickZ - MinBrickCoordinates.Z,-1,127);
+				}
+			}
+		}
+	}
+}
+
 void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates)
 {
 	// Expand the brick box by 1 brick so that bricks facing the one being invalidated are also updated.
 	const FInt3 FacingExpansionExtent = FInt3::Scalar(1);
+
+	// Update the region non-empty brick max Z maps.
+	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
+	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(MaxBrickCoordinates);
+	for(int32 RegionZ = Parameters.MinRegionCoordinates.Z;RegionZ <= MaxRegionCoordinates.Z;++RegionZ)
+	{
+		for(int32 RegionY = MinRegionCoordinates.Y;RegionY <= MaxRegionCoordinates.Y;++RegionY)
+		{
+			for(int32 RegionX = MinRegionCoordinates.X;RegionX <= MaxRegionCoordinates.X;++RegionX)
+			{
+				const FInt3 RegionCoordinates(RegionX,RegionY,RegionZ);
+				const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
+				if(RegionIndex)
+				{
+					const FInt3 MinRegionBrickCoordinates = RegionCoordinates * BricksPerRegion;
+					const FInt3 MinDirtyRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),MinBrickCoordinates - MinRegionBrickCoordinates);
+					const FInt3 MaxDirtyRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),MaxBrickCoordinates - MinRegionBrickCoordinates);
+					UpdateMaxNonEmptyBrickMap(Regions[*RegionIndex],MinDirtyRegionBrickCoordinates,MaxDirtyRegionBrickCoordinates);
+				}
+			}
+		}
+	}
 
 	// Invalidate render components. Note that because of ambient occlusion, the render chunks need to be invalidated all the way to the bottom of the grid!
 	const FInt3 AmbientOcclusionExpansionExtent = FInt3::Scalar(Parameters.AmbientOcclusionBlurRadius);
 	const FInt3 RenderExpansionExtent = AmbientOcclusionExpansionExtent + FacingExpansionExtent;
 	const FInt3 MinRenderChunkCoordinates = BrickToRenderChunkCoordinates(MinBrickCoordinates - RenderExpansionExtent);
 	const FInt3 MaxRenderChunkCoordinates = BrickToRenderChunkCoordinates(MaxBrickCoordinates + RenderExpansionExtent);
-	const FInt3 MinAmbientOcclusionCoordinates = FInt3(MinRenderChunkCoordinates.X,MinRenderChunkCoordinates.Y,UBrickGridComponent::MinBrickCoordinates.Z);
 	for(int32 ChunkX = MinRenderChunkCoordinates.X;ChunkX <= MaxRenderChunkCoordinates.X;++ChunkX)
 	{
 		for(int32 ChunkY = MinRenderChunkCoordinates.Y;ChunkY <= MaxRenderChunkCoordinates.Y;++ChunkY)
 		{
-			for(int32 ChunkZ = MinAmbientOcclusionCoordinates.Z;ChunkZ <= MaxRenderChunkCoordinates.Z;++ChunkZ)
+			for(int32 ChunkZ = UBrickGridComponent::MinBrickCoordinates.Z;ChunkZ <= MaxRenderChunkCoordinates.Z;++ChunkZ)
 			{
 				UBrickRenderComponent* RenderComponent = RenderChunkCoordinatesToComponent.FindRef(FInt3(ChunkX,ChunkY,ChunkZ));
 				if(RenderComponent)
@@ -194,6 +295,9 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 
 						// Initialize the region's bricks to the empty material.
 						Region.BrickContents.Init(Parameters.EmptyMaterialIndex, 1 << Parameters.BricksPerRegionLog2.SumComponents());
+
+						// Compute the region's non-empty height map.
+						UpdateMaxNonEmptyBrickMap(Region,FInt3::Scalar(0),BricksPerRegion - FInt3::Scalar(1));
 
 						// Add the region to the coordinate map.
 						RegionCoordinatesToIndex.Add(RegionCoordinates,RegionIndex);
@@ -324,17 +428,6 @@ UBrickGridComponent::UBrickGridComponent(const FPostConstructInitializePropertie
 	PrimaryComponentTick.bStartWithTickEnabled =true;
 
 	Init(Parameters);
-}
-
-void UBrickGridComponent::PostLoad()
-{
-	Super::PostLoad();
-
-	// Recreate the region coordinate to index map, which isn't serialized.
-	for(auto RegionIt = Regions.CreateConstIterator();RegionIt;++RegionIt)
-	{
-		RegionCoordinatesToIndex.Add(RegionIt->Coordinates,RegionIt.GetIndex());
-	}
 }
 
 void UBrickGridComponent::OnRegister()
