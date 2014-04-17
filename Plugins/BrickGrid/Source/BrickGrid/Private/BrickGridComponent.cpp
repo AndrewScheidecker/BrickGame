@@ -362,14 +362,18 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 	}
 
 	// Create render components for any chunks closer to the viewer than the draw distance, and destroy any that are no longer inside the draw distance.
+	// Do this visibility check in 2D so the chunks underneath those on the horizon are also drawn even if they are too far.
 	const FInt3 MinRenderChunkCoordinates = BrickToRenderChunkCoordinates(FInt3::Max(MinBrickCoordinates, FInt3::Floor(LocalViewPosition - FVector(LocalMaxDrawDistance))));
 	const FInt3 MaxRenderChunkCoordinates = BrickToRenderChunkCoordinates(FInt3::Min(MaxBrickCoordinates, FInt3::Ceil(LocalViewPosition + FVector(LocalMaxDrawDistance))));
 	for (auto ChunkIt = RenderChunkCoordinatesToComponent.CreateIterator(); ChunkIt; ++ChunkIt)
 	{
-		const FBox ChunkBounds((ChunkIt.Key() * BricksPerRenderChunk).ToFloat(),((ChunkIt.Key() + FInt3::Scalar(1)) * BricksPerRenderChunk).ToFloat());
-		if(	FInt3::Any(ChunkIt.Key() < MinRenderChunkCoordinates)
-		||	FInt3::Any(ChunkIt.Key() > MaxRenderChunkCoordinates)
-		||	ChunkBounds.ComputeSquaredDistanceToPoint(LocalViewPosition) > FMath::Square(LocalMaxDrawDistance))
+		const FInt3 MinChunkBrickCoordinates = ChunkIt.Key() * BricksPerRenderChunk;
+		const FInt3 MaxChunkBrickCoordinates = MinChunkBrickCoordinates + BricksPerRenderChunk - FInt3::Scalar(1);
+		const FBox ChunkBounds(
+			FInt3(MinChunkBrickCoordinates.X,MinChunkBrickCoordinates.Y,MinBrickCoordinates.Z).ToFloat(),
+			FInt3(MinChunkBrickCoordinates.X,MinChunkBrickCoordinates.Y,MaxBrickCoordinates.Z).ToFloat()
+			);
+		if(ChunkBounds.ComputeSquaredDistanceToPoint(LocalViewPosition) > FMath::Square(LocalMaxDrawDistance))
 		{
 			ChunkIt.Value()->DetachFromParent();
 			ChunkIt.Value()->DestroyComponent();
@@ -377,14 +381,19 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 		}
 	}
 	int32 NumLowPriorityRenderChunkUpdates = 0;
-	for(int32 ChunkZ = MinRenderChunkCoordinates.Z;ChunkZ <= MaxRenderChunkCoordinates.Z;++ChunkZ)
+	for(int32 ChunkZ = BrickToRenderChunkCoordinates(MinBrickCoordinates).Z;ChunkZ <= BrickToRenderChunkCoordinates(MaxBrickCoordinates).Z;++ChunkZ)
 	{
 		for(int32 ChunkY = MinRenderChunkCoordinates.Y;ChunkY <= MaxRenderChunkCoordinates.Y;++ChunkY)
 		{
 			for(int32 ChunkX = MinRenderChunkCoordinates.X;ChunkX <= MaxRenderChunkCoordinates.X;++ChunkX)
 			{
 				const FInt3 ChunkCoordinates(ChunkX,ChunkY,ChunkZ);
-				const FBox ChunkBounds((ChunkCoordinates * BricksPerRenderChunk).ToFloat(),((ChunkCoordinates + FInt3::Scalar(1)) * BricksPerRenderChunk).ToFloat());
+				const FInt3 MinChunkBrickCoordinates = ChunkCoordinates * BricksPerRenderChunk;
+				const FInt3 MaxChunkBrickCoordinates = MinChunkBrickCoordinates + BricksPerRenderChunk - FInt3::Scalar(1);
+				const FBox ChunkBounds(
+					FInt3(MinChunkBrickCoordinates.X,MinChunkBrickCoordinates.Y,MinBrickCoordinates.Z).ToFloat(),
+					FInt3(MinChunkBrickCoordinates.X,MinChunkBrickCoordinates.Y,MaxBrickCoordinates.Z).ToFloat()
+					);
 				if(ChunkBounds.ComputeSquaredDistanceToPoint(LocalViewPosition) < FMath::Square(LocalMaxDrawDistance))
 				{
 					UBrickRenderComponent* RenderComponent = RenderChunkCoordinatesToComponent.FindRef(ChunkCoordinates);
