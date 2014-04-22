@@ -80,26 +80,52 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 	const FLocalNoiseFunction LocalErodedHeightFunction(Parameters.ErodedHeightFunction,LocalToWorldScale / Parameters.Scale);
 	const FLocalNoiseFunction LocalErosionFunction(Parameters.ErosionFunction,LocalToWorldScale / Parameters.Scale);
 	const FLocalNoiseFunction LocalMoistureFunction(Parameters.MoistureFunction,LocalToWorldScale / Parameters.Scale);
-	const FLocalNoiseFunction LocalDirtProbabilityFunction(Parameters.DirtProbabilityFunction,LocalToWorldScale / Parameters.Scale);
+	const FLocalNoiseFunction LocalDirtThicknessFunction(Parameters.DirtThicknessFunction,LocalToWorldScale / Parameters.Scale);
 	const FLocalNoiseFunction LocalCavernProbabilityFunction(Parameters.CavernProbabilityFunction,LocalToWorldScale / Parameters.Scale);
 	const float NoiseToLocalScale = Parameters.Scale / LocalToWorldScale;
 
+	// Allocate a local array for the generated bricks.
 	const FInt3 BricksPerRegion = Grid->BricksPerRegion;
+	TArray<uint8> LocalBrickMaterials;
+	LocalBrickMaterials.Init(BricksPerRegion.X * BricksPerRegion.Y * BricksPerRegion.Z);
+
 	const FInt3 MinRegionBrickCoordinates = RegionCoordinates * BricksPerRegion;
 	const FInt3 MaxRegionBrickCoordinates = MinRegionBrickCoordinates + BricksPerRegion - FInt3::Scalar(1);
-	for(int32 Y = MinRegionBrickCoordinates.Y;Y <= MaxRegionBrickCoordinates.Y;++Y)
+	for(int32 LocalY = 0;LocalY < BricksPerRegion.Y;++LocalY)
 	{
-		for(int32 X = MinRegionBrickCoordinates.X;X <= MaxRegionBrickCoordinates.X;++X)
+		for(int32 LocalX = 0;LocalX < BricksPerRegion.X;++LocalX)
 		{
+			const int32 X = MinRegionBrickCoordinates.X + LocalX;
+			const int32 Y = MinRegionBrickCoordinates.Y + LocalY;
 			const float Erosion = LocalErosionFunction.Sample2D(BiasedSeed * 59 + X,Y);
 			const float UnerodedGroundHeight = LocalUnerodedHeightFunction.Sample2D(BiasedSeed * 67 + X,Y) * NoiseToLocalScale;
 			const float ErodedGroundHeight = LocalErodedHeightFunction.Sample2D(BiasedSeed * 71 + X,Y) * NoiseToLocalScale;
-			const float GroundHeight = FMath::Lerp(UnerodedGroundHeight,ErodedGroundHeight,Erosion);
+			const float RockHeight = FMath::Lerp(UnerodedGroundHeight,ErodedGroundHeight,Erosion);
+			const float BaseDirtThickness = LocalDirtThicknessFunction.Sample2D(BiasedSeed * 79 + X,Y) * NoiseToLocalScale;
+			const float DirtThicknessFactor = Parameters.DirtThicknessFactorByHeight->FloatCurve.Eval(RockHeight * LocalToWorldScale);
+			const float DirtThickness = FMath::Max(0.0f,BaseDirtThickness * DirtThicknessFactor);
+			const float GroundHeight = RockHeight + DirtThickness;
 
+			const int32 BrickRockHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FMath::Ceil(RockHeight));
 			const int32 BrickGroundHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FMath::Ceil(GroundHeight));
 
-			for(int32 Z = MinRegionBrickCoordinates.Z;Z <= MaxRegionBrickCoordinates.Z;++Z)
+			float CavernProbabilitySamples[BrickGridConstants::MaxBricksPerRegionAxis];
+			const uint32 NumCavernProbabilitySamples = FMath::Min(BrickGridConstants::MaxBricksPerRegionAxis >> 2,(BrickGroundHeight + 3) >> 2);
+			float PreviousCavernProbabilitySample = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z - 1);
+			for(uint32 CavernSampleIndex = 0;CavernSampleIndex < NumCavernProbabilitySamples;++CavernSampleIndex)
 			{
+				const uint32 LocalZ = CavernSampleIndex << 2;
+				const float NextCavernProbabilitySample = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z + LocalZ + 3);
+				CavernProbabilitySamples[LocalZ + 0] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,1.0f / 4.0f);
+				CavernProbabilitySamples[LocalZ + 1] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,2.0f / 4.0f);
+				CavernProbabilitySamples[LocalZ + 2] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,3.0f / 4.0f);
+				CavernProbabilitySamples[LocalZ + 3] = NextCavernProbabilitySample;
+				PreviousCavernProbabilitySample = NextCavernProbabilitySample;
+			}
+
+			for(int32 LocalZ = 0;LocalZ < BricksPerRegion.Z;++LocalZ)
+			{
+				const int32 Z = MinRegionBrickCoordinates.Z + LocalZ;
 				const FInt3 BrickCoordinates(X,Y,Z);
 				int32 MaterialIndex = 0;
 				if(Z == Grid->MinBrickCoordinates.Z)
@@ -108,11 +134,16 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 				}
 				else if(Z <= BrickGroundHeight)
 				{
-					const float DirtProbability = LocalDirtProbabilityFunction.Sample3D(BiasedSeed * 79 + X,Y,Z);
-					const float CavernProbability = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,Z);
+					const float CavernProbability = CavernProbabilitySamples[LocalZ];
 					const float RockCavernThreshold = Parameters.CavernThresholdByHeight->FloatCurve.Eval(Z * LocalToWorldScale);
-					const float DirtThreshold = Parameters.DirtThresholdByHeight->FloatCurve.Eval(Z * LocalToWorldScale);
-					if(DirtProbability < DirtThreshold)
+					if(Z <= BrickRockHeight)
+					{
+						if(CavernProbability > RockCavernThreshold)
+						{
+							MaterialIndex = Parameters.RockMaterialIndex;
+						}
+					}
+					else
 					{
 						if(CavernProbability > RockCavernThreshold + Parameters.DirtCavernThresholdBias)
 						{
@@ -121,21 +152,13 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 								: Parameters.DirtMaterialIndex;
 						}
 					}
-					else
-					{
-						if(CavernProbability > RockCavernThreshold)
-						{
-							MaterialIndex = Parameters.RockMaterialIndex;
-						}
-					}
 				}
-				Grid->SetBrickWithoutInvalidatingComponents(BrickCoordinates,MaterialIndex);
+				LocalBrickMaterials[((LocalY * BricksPerRegion.X) + LocalX) * BricksPerRegion.Z + LocalZ] = MaterialIndex;
 			}
 		}
 	}
 
-	// Invalidate the chunk components for this region.
-	Grid->InvalidateChunkComponents(MinRegionBrickCoordinates,MaxRegionBrickCoordinates);
+	Grid->SetBrickMaterialArray(MinRegionBrickCoordinates,MaxRegionBrickCoordinates,LocalBrickMaterials);
 
 	UE_LOG(LogStats,Log,TEXT("UBrickTerrainGenerationLibrary::InitRegion took %fms"),1000.0f * float(FPlatformTime::Seconds() - StartTime));
 }

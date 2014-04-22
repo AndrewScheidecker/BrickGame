@@ -13,7 +13,7 @@ void UBrickGridComponent::Init(const FBrickGridParameters& InParameters)
 	Parameters.EmptyMaterialIndex = FMath::Clamp<int32>(Parameters.EmptyMaterialIndex, 0, Parameters.Materials.Num() - 1);
 
 	// Limit each region to 128x128x128 bricks, which is the largest power of 2 size that can be rendered using 8-bit relative vertex positions.
-	Parameters.BricksPerRegionLog2 = FInt3::Clamp(Parameters.BricksPerRegionLog2, FInt3::Scalar(0), FInt3::Scalar(7));
+	Parameters.BricksPerRegionLog2 = FInt3::Clamp(Parameters.BricksPerRegionLog2, FInt3::Scalar(0), FInt3::Scalar(BrickGridConstants::MaxBricksPerRegionAxisLog2));
 
 	// Don't allow fractional chunks/region, or chunks smaller than one brick.
 	Parameters.RenderChunksPerRegionLog2 = FInt3::Clamp(Parameters.RenderChunksPerRegionLog2, FInt3::Scalar(0), Parameters.BricksPerRegionLog2);
@@ -135,17 +135,46 @@ void UBrickGridComponent::GetBrickMaterialArray(const FInt3& MinBrickCoordinates
 	}
 }
 
-bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 MaterialIndex)
+void UBrickGridComponent::SetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,const TArray<uint8>& BrickMaterials)
 {
-	if(SetBrickWithoutInvalidatingComponents(BrickCoordinates,MaterialIndex))
+	const FInt3 InputSize = MaxBrickCoordinates - MinBrickCoordinates + FInt3::Scalar(1);
+	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
+	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(MaxBrickCoordinates);
+	for(int32 RegionY = MinRegionCoordinates.Y;RegionY <= MaxRegionCoordinates.Y;++RegionY)
 	{
-		InvalidateChunkComponents(BrickCoordinates,BrickCoordinates);
-		return true;
+		for(int32 RegionX = MinRegionCoordinates.X;RegionX <= MaxRegionCoordinates.X;++RegionX)
+		{
+			for(int32 RegionZ = MinRegionCoordinates.Z;RegionZ <= MaxRegionCoordinates.Z;++RegionZ)
+			{
+				const FInt3 RegionCoordinates(RegionX,RegionY,RegionZ);
+				const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
+				const FInt3 MinRegionBrickCoordinates = FInt3(RegionX,RegionY,RegionZ) * BricksPerRegion;
+				const FInt3 MinInputRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),MinBrickCoordinates - MinRegionBrickCoordinates);
+				const FInt3 MaxInputRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),MaxBrickCoordinates - MinRegionBrickCoordinates);
+				for(int32 RegionBrickY = MinInputRegionBrickCoordinates.Y;RegionBrickY <= MaxInputRegionBrickCoordinates.Y;++RegionBrickY)
+				{
+					for(int32 RegionBrickX = MinInputRegionBrickCoordinates.X;RegionBrickX <= MaxInputRegionBrickCoordinates.X;++RegionBrickX)
+					{
+						const int32 InputX = MinRegionBrickCoordinates.X + RegionBrickX - MinBrickCoordinates.X;
+						const int32 InputY = MinRegionBrickCoordinates.Y + RegionBrickY - MinBrickCoordinates.Y;
+						const int32 InputMinZ = MinRegionBrickCoordinates.Z + MinInputRegionBrickCoordinates.Z - MinBrickCoordinates.Z;
+						const int32 InputSizeZ = MaxInputRegionBrickCoordinates.Z - MinInputRegionBrickCoordinates.Z + 1;
+						const uint32 InputBaseBrickIndex = (InputY * InputSize.X + InputX) * InputSize.Z + InputMinZ;
+						const uint32 RegionBaseBrickIndex = (((RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX) << Parameters.BricksPerRegionLog2.Z) + MinInputRegionBrickCoordinates.Z;
+						if(RegionIndex)
+						{
+							FMemory::Memcpy(&Regions[*RegionIndex].BrickContents[RegionBaseBrickIndex],&BrickMaterials[InputBaseBrickIndex],InputSizeZ * sizeof(uint8));
+						}
+					}
+				}
+			}
+		}
 	}
-	return false;
+
+	InvalidateChunkComponents(MinBrickCoordinates,MaxBrickCoordinates);
 }
 
-bool UBrickGridComponent::SetBrickWithoutInvalidatingComponents(const FInt3& BrickCoordinates, int32 MaterialIndex)
+bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 MaterialIndex)
 {
 	if(FInt3::All(BrickCoordinates >= MinBrickCoordinates) && FInt3::All(BrickCoordinates <= MaxBrickCoordinates) && MaterialIndex < Parameters.Materials.Num())
 	{
@@ -156,6 +185,7 @@ bool UBrickGridComponent::SetBrickWithoutInvalidatingComponents(const FInt3& Bri
 			const uint32 BrickIndex = BrickCoordinatesToRegionBrickIndex(RegionCoordinates,BrickCoordinates);
 			FBrickRegion& Region = Regions[*RegionIndex];
 			Region.BrickContents[BrickIndex] = MaterialIndex;
+			InvalidateChunkComponents(BrickCoordinates,BrickCoordinates);
 			return true;
 		}
 	}

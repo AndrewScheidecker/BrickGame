@@ -3,6 +3,12 @@
 #pragma once
 #include "BrickGridComponent.generated.h"
 
+namespace BrickGridConstants
+{
+	enum { MaxBricksPerRegionAxisLog2 = 7 };
+	enum { MaxBricksPerRegionAxis = 1 << MaxBricksPerRegionAxisLog2 };
+};
+
 /** Shifts a number right with sign extension. */
 inline int32 SignedShiftRight(int32 A,int32 B)
 {
@@ -237,6 +243,7 @@ public:
 	BRICKGRID_API FBrick GetBrick(const FInt3& BrickCoordinates) const;
 
 	BRICKGRID_API void GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint8>& OutBrickMaterials) const;
+	BRICKGRID_API void SetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,const TArray<uint8>& BrickMaterials);
 
 	// Returns a height-map containing the non-empty brick with greatest Z for each XY in the rectangle bounded by MinBrickCoordinates.XY-MaxBrickCoordinates.XY.
 	// The returned heights are relative to MinBrickCoordinates.Z, but MaxBrickCoordinates.Z is ignored.
@@ -246,10 +253,6 @@ public:
 	// Writes the brick at the given coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API bool SetBrick(const FInt3& BrickCoordinates,int32 MaterialIndex);
-
-	// Writes the brick at the given coordinates without invalidating the chunk components.
-	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API bool SetBrickWithoutInvalidatingComponents(const FInt3& BrickCoordinates,int32 MaterialIndex);
 
 	// Invalidates the chunk components for a range of brick coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")

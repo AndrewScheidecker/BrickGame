@@ -65,10 +65,10 @@ struct FBrickTerrainGenerationParameters
 	FNoiseFunction ErosionFunction;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
-	FNoiseFunction DirtProbabilityFunction;
+	FNoiseFunction DirtThicknessFunction;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
-	UCurveFloat* DirtThresholdByHeight;
+	UCurveFloat* DirtThicknessFactorByHeight;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
 	FNoiseFunction CavernProbabilityFunction;

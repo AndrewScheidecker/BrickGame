@@ -99,8 +99,8 @@ public:
         float y2 = y0 - 1.0f + 2.0f * G2;
 
         // Wrap the integer indices at 256, to avoid indexing perm[] out of bounds
-        int32 ii = i % 256;
-        int32 jj = j % 256;
+        int32 ii = i & 255;
+        int32 jj = j & 255;
 
         // Calculate the contribution from the three corners
         float t0 = 0.5f - x0*x0-y0*y0;
@@ -189,9 +189,9 @@ public:
         float z3 = z0 - 1.0f + 3.0f*G3;
 
         // Wrap the integer indices at 256, to avoid indexing perm[] out of bounds
-        int32 ii = Mod(i, 256);
-        int32 jj = Mod(j, 256);
-        int32 kk = Mod(k, 256);
+        int32 ii = i & 255;
+        int32 jj = j & 255;
+        int32 kk = k & 255;
 
         // Calculate the contribution from the four corners
         float t0 = 0.6f - x0*x0 - y0*y0 - z0*z0;
@@ -260,12 +260,6 @@ public:
     }
 
 private:
-
-    int32 Mod(int32 x, int32 m)
-    {
-        int32 a = x % m;
-        return a < 0 ? a + m : a;
-    }
 
     float grad( int32 hash, float x )
     {
