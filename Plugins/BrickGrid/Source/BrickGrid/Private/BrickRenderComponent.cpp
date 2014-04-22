@@ -63,15 +63,15 @@ public:
 class FBrickChunkIndexBuffer : public FIndexBuffer 
 {
 public:
-	TArray<int16> Indices;
+	TArray<int32> Indices;
 	virtual void InitRHI()
 	{
 		if (Indices.Num() > 0)
 		{
-			IndexBufferRHI = RHICreateIndexBuffer(sizeof(int16), Indices.Num() * sizeof(int16), NULL, BUF_Static);
+			IndexBufferRHI = RHICreateIndexBuffer(sizeof(int32), Indices.Num() * sizeof(int32), NULL, BUF_Static);
 			// Write the indices to the index buffer.
-			void* Buffer = RHILockIndexBuffer(IndexBufferRHI, 0, Indices.Num() * sizeof(int16), RLM_WriteOnly);
-			FMemory::Memcpy(Buffer, Indices.GetTypedData(), Indices.Num() * sizeof(int16));
+			void* Buffer = RHILockIndexBuffer(IndexBufferRHI, 0, Indices.Num() * sizeof(int32), RLM_WriteOnly);
+			FMemory::Memcpy(Buffer, Indices.GetTypedData(), Indices.Num() * sizeof(int32));
 			RHIUnlockIndexBuffer(IndexBufferRHI);
 		}
 	}
@@ -284,7 +284,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 	// Batch the faces by material and direction.
 	struct FFaceBatch
 	{
-		TArray<int16> Indices;
+		TArray<int32> Indices;
 	};
 	struct FMaterialBatch
 	{
@@ -370,7 +370,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 								// Write the indices for the brick face.
 								FFaceBatch& FaceBatch = MaterialBatches[BrickMaterial].FaceBatches[FaceIndex];
-								int16* FaceVertexIndex = &FaceBatch.Indices[FaceBatch.Indices.AddUninitialized(6)];
+								int32* FaceVertexIndex = &FaceBatch.Indices[FaceBatch.Indices.AddUninitialized(6)];
 								*FaceVertexIndex++ = BaseFaceVertexIndex + 0;
 								*FaceVertexIndex++ = BaseFaceVertexIndex + 1;
 								*FaceVertexIndex++ = BaseFaceVertexIndex + 2;
