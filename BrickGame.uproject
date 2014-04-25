@@ -17,5 +17,6 @@
 			"LoadingPhase": "Default"
 		}
 	],
-	"EpicSampleNameHash": "0"
+	"EpicSampleNameHash": "0",
+	"EngineAssociation": "{68D5C3AE-4E15-DF05-26D0-18BB405045E8}"
 }
