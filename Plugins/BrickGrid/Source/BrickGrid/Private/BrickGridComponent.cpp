@@ -342,24 +342,25 @@ void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinBrickCoordin
 	}
 }
 
-void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,int32 MaxRegionsToCreate,FBrickGrid_InitRegion OnInitRegion)
+void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,float MaxDesiredUpdateTime,FBrickGrid_InitRegion OnInitRegion)
 {
 	const FVector LocalViewPosition = GetComponenTransform().InverseTransformPosition(WorldViewPosition);
 	const float LocalMaxDrawDistance = FMath::Max(0.0f,MaxDrawDistance / GetComponenTransform().GetScale3D().GetMin());
 	const float LocalMaxCollisionDistance = FMath::Max(0.0f,MaxCollisionDistance / GetComponenTransform().GetScale3D().GetMin());
 	const float LocalMaxDrawAndCollisionDistance = FMath::Max(LocalMaxDrawDistance,LocalMaxCollisionDistance);
 
+	const double StartTime = FPlatformTime::Seconds();
+
 	// Initialize any regions that are closer to the viewer than the draw or collision distance.
 	// Include an additional ring of regions around what is being drawn or colliding so it has plenty of frames to spread initialization over before the data is needed.r
 	const FInt3 MinInitRegionCoordinates = FInt3::Max(Parameters.MinRegionCoordinates,BrickToRegionCoordinates(FInt3::Floor(LocalViewPosition - FVector(LocalMaxDrawAndCollisionDistance))) - FInt3::Scalar(1));
 	const FInt3 MaxInitRegionCoordinates = FInt3::Min(Parameters.MaxRegionCoordinates,BrickToRegionCoordinates(FInt3::Ceil(LocalViewPosition + FVector(LocalMaxDrawAndCollisionDistance))) + FInt3::Scalar(1));
 	const float RegionExpansionRadius = BricksPerRegion.ToFloat().GetMin();
-	int32 NumInitializedRegions = 0;
-	for(int32 RegionZ = MinInitRegionCoordinates.Z;RegionZ <= MaxInitRegionCoordinates.Z && NumInitializedRegions < MaxRegionsToCreate;++RegionZ)
+	for(int32 RegionZ = MinInitRegionCoordinates.Z;RegionZ <= MaxInitRegionCoordinates.Z && (FPlatformTime::Seconds() - StartTime) < MaxDesiredUpdateTime;++RegionZ)
 	{
-		for(int32 RegionY = MinInitRegionCoordinates.Y;RegionY <= MaxInitRegionCoordinates.Y && NumInitializedRegions < MaxRegionsToCreate;++RegionY)
+		for(int32 RegionY = MinInitRegionCoordinates.Y;RegionY <= MaxInitRegionCoordinates.Y && (FPlatformTime::Seconds() - StartTime) < MaxDesiredUpdateTime;++RegionY)
 		{
-			for(int32 RegionX = MinInitRegionCoordinates.X;RegionX <= MaxInitRegionCoordinates.X && NumInitializedRegions < MaxRegionsToCreate;++RegionX)
+			for(int32 RegionX = MinInitRegionCoordinates.X;RegionX <= MaxInitRegionCoordinates.X && (FPlatformTime::Seconds() - StartTime) < MaxDesiredUpdateTime;++RegionX)
 			{
 				const FInt3 RegionCoordinates(RegionX,RegionY,RegionZ);
 				const FBox RegionBounds((RegionCoordinates * BricksPerRegion).ToFloat(),((RegionCoordinates + FInt3::Scalar(1)) * BricksPerRegion).ToFloat());
@@ -383,8 +384,6 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 
 						// Call the InitRegion delegate for the new region.
 						OnInitRegion.Execute(RegionCoordinates);
-
-						++NumInitializedRegions;
 					}
 				}
 			}
@@ -411,11 +410,11 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 		}
 	}
 	int32 NumLowPriorityRenderChunkUpdates = 0;
-	for(int32 ChunkZ = BrickToRenderChunkCoordinates(MinBrickCoordinates).Z;ChunkZ <= BrickToRenderChunkCoordinates(MaxBrickCoordinates).Z;++ChunkZ)
+	for(int32 ChunkZ = BrickToRenderChunkCoordinates(MinBrickCoordinates).Z;ChunkZ <= BrickToRenderChunkCoordinates(MaxBrickCoordinates).Z && (FPlatformTime::Seconds() - StartTime) < MaxDesiredUpdateTime;++ChunkZ)
 	{
-		for(int32 ChunkY = MinRenderChunkCoordinates.Y;ChunkY <= MaxRenderChunkCoordinates.Y;++ChunkY)
+		for(int32 ChunkY = MinRenderChunkCoordinates.Y;ChunkY <= MaxRenderChunkCoordinates.Y && (FPlatformTime::Seconds() - StartTime) < MaxDesiredUpdateTime;++ChunkY)
 		{
-			for(int32 ChunkX = MinRenderChunkCoordinates.X;ChunkX <= MaxRenderChunkCoordinates.X;++ChunkX)
+			for(int32 ChunkX = MinRenderChunkCoordinates.X;ChunkX <= MaxRenderChunkCoordinates.X && (FPlatformTime::Seconds() - StartTime) < MaxDesiredUpdateTime;++ChunkX)
 			{
 				const FInt3 ChunkCoordinates(ChunkX,ChunkY,ChunkZ);
 				const FInt3 MinChunkBrickCoordinates = ChunkCoordinates * BricksPerRenderChunk;
@@ -444,11 +443,10 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 					}
 
 					// Flush low-priority pending updates to render components up to some per-frame limit.
-					if(RenderComponent->HasLowPriorityUpdatePending && NumLowPriorityRenderChunkUpdates < MaxRegionsToCreate)
+					if(RenderComponent->HasLowPriorityUpdatePending)
 					{
 						RenderComponent->MarkRenderStateDirty();
 						RenderComponent->HasLowPriorityUpdatePending = false;
-						NumLowPriorityRenderChunkUpdates++;
 					}
 				}
 			}
