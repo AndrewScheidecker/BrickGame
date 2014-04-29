@@ -202,11 +202,76 @@ public:
 		}
 	}
 
+	#if UE4_HAS_LOD_CULLING_CHANGES
+		FVisibleLODArray GetLODsForPosition(const FVector4& Position) const
+		{
+			FVisibleLODArray VisibleFaceIndices;
+
+			const FBox BoundingBox = GetBounds().GetBox();
+			const FVector MinRelativePosition = Position - BoundingBox.Min * Position.W;
+			const FVector MaxRelativePosition = Position - BoundingBox.Max * Position.W;
+
+			if(MinRelativePosition.X > 0.0f)
+			{
+				// If the position is inside the -X bounds, draw the +X faces.
+				const int8 FaceIndexPosX = 1;
+				VisibleFaceIndices.Add(FaceIndexPosX);
+			}
+			if(MaxRelativePosition.X < 0.0f)
+			{
+				// If the position is inside the +X bounds, draw the -X faces.
+				const int8 FaceIndexNegX = 0;
+				VisibleFaceIndices.Add(FaceIndexNegX);
+			}
+
+			if(MinRelativePosition.Y > 0.0f)
+			{
+				// If the position is inside the -Y bounds, draw the +Y faces.
+				const int8 FaceIndexPosY = 3;
+				VisibleFaceIndices.Add(FaceIndexPosY);
+			}
+			if(MaxRelativePosition.Y < 0.0f)
+			{
+				// If the position is inside the +Y bounds, draw the -Y faces.
+				const int8 FaceIndexNegY = 2;
+				VisibleFaceIndices.Add(FaceIndexNegY);
+			}
+
+			if(MinRelativePosition.Z > 0.0f)
+			{
+				// If the position is inside the -Z bounds, draw the +Z faces.
+				const int8 FaceIndexPosZ = 5;
+				VisibleFaceIndices.Add(FaceIndexPosZ);
+			}
+			if(MaxRelativePosition.Z < 0.0f)
+			{
+				// If the position is inside the +Z bounds, draw the -Z faces.
+				const int8 FaceIndexNegZ = 4;
+				VisibleFaceIndices.Add(FaceIndexNegZ);
+			}
+
+			return VisibleFaceIndices;
+		}
+
+		virtual FVisibleLODArray GetStaticElementLODs(const FSceneView* View) const OVERRIDE
+		{
+			return GetLODsForPosition(View->ViewMatrices.ViewOrigin);
+		}
+		virtual FVisibleLODArray GetShadowStaticElementLODs(const FLightSceneProxy* LightSceneProxy,const FSceneViewFamily& ViewFamily,bool bReflectiveShadowMap) const OVERRIDE
+		{
+			return GetLODsForPosition(LightSceneProxy->GetPosition());
+		}
+	#endif
+
 	virtual void DrawStaticElements(FStaticPrimitiveDrawInterface* PDI) OVERRIDE
 	{
 		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
-			PDI->DrawMesh(GetMeshBatch(ElementIndex,NULL),0,FLT_MAX);
+			#if UE4_HAS_LOD_CULLING_CHANGES
+				PDI->DrawMesh(GetMeshBatch(ElementIndex,NULL),Elements[ElementIndex].FaceIndex);
+			#else
+				PDI->DrawMesh(GetMeshBatch(ElementIndex,NULL),0,FLT_MAX);
+			#endif
 		}
 	}
 
