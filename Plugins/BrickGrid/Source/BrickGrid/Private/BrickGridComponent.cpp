@@ -344,9 +344,9 @@ void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinBrickCoordin
 
 void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,float MaxDesiredUpdateTime,FBrickGrid_InitRegion OnInitRegion)
 {
-	const FVector LocalViewPosition = GetComponenTransform().InverseTransformPosition(WorldViewPosition);
-	const float LocalMaxDrawDistance = FMath::Max(0.0f,MaxDrawDistance / GetComponenTransform().GetScale3D().GetMin());
-	const float LocalMaxCollisionDistance = FMath::Max(0.0f,MaxCollisionDistance / GetComponenTransform().GetScale3D().GetMin());
+	const FVector LocalViewPosition = GetComponentTransform().InverseTransformPosition(WorldViewPosition);
+	const float LocalMaxDrawDistance = FMath::Max(0.0f,MaxDrawDistance / GetComponentTransform().GetScale3D().GetMin());
+	const float LocalMaxCollisionDistance = FMath::Max(0.0f,MaxCollisionDistance / GetComponentTransform().GetScale3D().GetMin());
 	const float LocalMaxDrawAndCollisionDistance = FMath::Max(LocalMaxDrawDistance,LocalMaxCollisionDistance);
 
 	const double StartTime = FPlatformTime::Seconds();

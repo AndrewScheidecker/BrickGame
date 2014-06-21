@@ -129,11 +129,11 @@ struct FInt3
 	}
 	static inline FInt3 Floor(const FVector& V)
 	{
-		return FInt3(FMath::Floor(V.X),FMath::Floor(V.Y),FMath::Floor(V.Z));
+		return FInt3(FMath::FloorToInt(V.X), FMath::FloorToInt(V.Y), FMath::FloorToInt(V.Z));
 	}
 	static inline FInt3 Ceil(const FVector& V)
 	{
-		return FInt3(FMath::Ceil(V.X),FMath::Ceil(V.Y),FMath::Ceil(V.Z));
+		return FInt3(FMath::CeilToInt(V.X), FMath::CeilToInt(V.Y), FMath::CeilToInt(V.Z));
 	}
 	static inline bool Any(const FInt3& A)
 	{
