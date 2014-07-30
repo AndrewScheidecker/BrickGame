@@ -55,7 +55,8 @@ public:
 	{
 		if (Vertices.Num() > 0)
 		{
-			VertexBufferRHI = RHICreateVertexBuffer(Vertices.Num() * sizeof(FBrickVertex), NULL, BUF_Dynamic);
+			FRHIResourceCreateInfo CreateInfo;
+			VertexBufferRHI = RHICreateVertexBuffer(Vertices.Num() * sizeof(FBrickVertex), BUF_Dynamic, CreateInfo);
 			// Copy the vertex data into the vertex buffer.
 			void* VertexBufferData = RHILockVertexBuffer(VertexBufferRHI, 0, Vertices.Num() * sizeof(FBrickVertex), RLM_WriteOnly);
 			FMemory::Memcpy(VertexBufferData, Vertices.GetTypedData(), Vertices.Num() * sizeof(FBrickVertex));
@@ -73,7 +74,8 @@ public:
 	{
 		if (Indices.Num() > 0)
 		{
-			IndexBufferRHI = RHICreateIndexBuffer(sizeof(uint16), Indices.Num() * sizeof(uint16), NULL, BUF_Static);
+			FRHIResourceCreateInfo CreateInfo;
+			IndexBufferRHI = RHICreateIndexBuffer(sizeof(uint16), Indices.Num() * sizeof(uint16), BUF_Static, CreateInfo);
 			// Write the indices to the index buffer.
 			void* Buffer = RHILockIndexBuffer(IndexBufferRHI, 0, Indices.Num() * sizeof(uint16), RLM_WriteOnly);
 			FMemory::Memcpy(Buffer, Indices.GetTypedData(), Indices.Num() * sizeof(uint16));
@@ -88,7 +90,8 @@ class FBrickChunkTangentBuffer : public FVertexBuffer
 public:
 	virtual void InitRHI()
 	{
-		VertexBufferRHI = RHICreateVertexBuffer(12 * sizeof(FPackedNormal), NULL, BUF_Dynamic);
+		FRHIResourceCreateInfo CreateInfo;
+		VertexBufferRHI = RHICreateVertexBuffer(12 * sizeof(FPackedNormal), BUF_Dynamic, CreateInfo);
 		// Copy the vertex data into the vertex buffer.
 		FPackedNormal* TangentBufferData = (FPackedNormal*)RHILockVertexBuffer(VertexBufferRHI, 0, 12 * sizeof(FPackedNormal), RLM_WriteOnly);
 		for(int32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
@@ -181,13 +184,13 @@ public:
 		}
 	}
 
-	virtual void OnTransformChanged() OVERRIDE
+	virtual void OnTransformChanged() override
 	{
 		// Create a uniform buffer with the transform for the chunk.
 		PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate(FScaleMatrix(FVector(255, 255, 255)) * GetLocalToWorld(), GetBounds(), GetLocalBounds(), true);
 	}
 
-	virtual void DrawDynamicElements(FPrimitiveDrawInterface* PDI,const FSceneView* View) OVERRIDE
+	virtual void DrawDynamicElements(FPrimitiveDrawInterface* PDI,const FSceneView* View) override
 	{
 		// Set up the wireframe material Face.
 		FColoredMaterialRenderProxy WireframeMaterialFace(
@@ -253,17 +256,17 @@ public:
 			return VisibleFaceIndices;
 		}
 
-		virtual FVisibleLODArray GetStaticElementLODs(const FSceneView* View) const OVERRIDE
+		virtual FVisibleLODArray GetStaticElementLODs(const FSceneView* View) const override
 		{
 			return GetLODsForPosition(View->ViewMatrices.ViewOrigin);
 		}
-		virtual FVisibleLODArray GetShadowStaticElementLODs(const FLightSceneProxy* LightSceneProxy,const FSceneViewFamily& ViewFamily,bool bReflectiveShadowMap) const OVERRIDE
+		virtual FVisibleLODArray GetShadowStaticElementLODs(const FLightSceneProxy* LightSceneProxy,const FSceneViewFamily& ViewFamily,bool bReflectiveShadowMap) const override
 		{
 			return GetLODsForPosition(LightSceneProxy->GetPosition());
 		}
 	#endif
 
-	virtual void DrawStaticElements(FStaticPrimitiveDrawInterface* PDI) OVERRIDE
+	virtual void DrawStaticElements(FStaticPrimitiveDrawInterface* PDI) override
 	{
 		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
@@ -275,7 +278,7 @@ public:
 		}
 	}
 
-	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) OVERRIDE
+	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) override
 	{
 		FPrimitiveViewRelevance Result;
 		Result.bDrawRelevance = IsShown(View);
@@ -286,7 +289,7 @@ public:
 		return Result;
 	}
 
-	virtual bool CanBeOccluded() const OVERRIDE
+	virtual bool CanBeOccluded() const override
 	{
 		return !MaterialRelevance.bDisableDepthTest;
 	}

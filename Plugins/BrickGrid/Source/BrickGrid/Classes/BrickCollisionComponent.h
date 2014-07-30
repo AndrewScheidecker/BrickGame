@@ -21,12 +21,12 @@ public:
 	class UBrickGridComponent* Grid;
 
 	// Begin UPrimitiveComponent interface.
-	virtual FPrimitiveSceneProxy* CreateSceneProxy() OVERRIDE;
+	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
 	// End UPrimitiveComponent interface.
 
 	// Begin USceneComponent interface.
-	virtual FBoxSphereBounds CalcBounds(const FTransform & LocalToWorld) const OVERRIDE;
-	virtual class UBodySetup* GetBodySetup() OVERRIDE;
+	virtual FBoxSphereBounds CalcBounds(const FTransform & LocalToWorld) const override;
+	virtual class UBodySetup* GetBodySetup() override;
 	// End USceneComponent interface.
 
 private:

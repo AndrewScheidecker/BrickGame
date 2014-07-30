@@ -1,6 +1,7 @@
 // Copyright 2014, Andrew Scheidecker. All Rights Reserved. 
 
 #include "BrickGridPluginPrivatePCH.h"
+#include "ComponentReregisterContext.h"
 #include "BrickRenderComponent.h"
 #include "BrickCollisionComponent.h"
 #include "BrickGridComponent.h"

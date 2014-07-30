@@ -1,7 +1,6 @@
 // Copyright 2014, Andrew Scheidecker. All Rights Reserved. 
 
 #include "SuperLoopLibrary.h"
-#include "SuperLoopLibrary.generated.inl"
 
 IMPLEMENT_MODULE( IModuleInterface, SuperLoopLibrary )
 

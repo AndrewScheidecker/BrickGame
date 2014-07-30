@@ -2,7 +2,6 @@
 
 #include "SimplexNoise.h"
 #include "SimplexNoiseLibrary.h"
-#include "SimplexNoise.generated.inl"
 #include "PublicDomainSimplexNoise.inl"
 
 static FPublicDomainSimplexNoiseImplementation Implementation;
@@ -10,15 +9,15 @@ static FPublicDomainSimplexNoiseImplementation Implementation;
 // Dynamically-loaded module interface
 class FSimplexNoise : public ISimplexNoise
 {
-	virtual float Sample(float X) OVERRIDE
+	virtual float Sample(float X) override
 	{
 		return Implementation.Generate(X);
 	}
-	virtual float Sample2D(float X,float Y) OVERRIDE
+	virtual float Sample2D(float X,float Y) override
 	{
 		return Implementation.Generate(X,Y);
 	}
-	virtual float Sample3D(float X,float Y,float Z) OVERRIDE
+	virtual float Sample3D(float X,float Y,float Z) override
 	{
 		return Implementation.Generate(X,Y,Z);
 	}

@@ -4,7 +4,6 @@
 #define __BRICKGAME_H__
 
 #include "Engine.h"
-#include "EngineKismetLibraryClasses.h"
 
 #define COLLISION_PROJECTILE	ECC_GameTraceChannel1
 

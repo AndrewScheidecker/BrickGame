@@ -11,7 +11,7 @@ class ABrickGameHUD : public AHUD
 public:
 
 	/** Primary draw call for the HUD */
-	virtual void DrawHUD() OVERRIDE;
+	virtual void DrawHUD() override;
 
 private:
 	/** Crosshair asset pointer */

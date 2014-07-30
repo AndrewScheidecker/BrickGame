@@ -1,7 +1,6 @@
 // Copyright 2014, Andrew Scheidecker. All Rights Reserved. 
 
 #include "ConsoleCommand.h"
-#include "ConsoleAPI.generated.inl"
 
 IMPLEMENT_MODULE( IModuleInterface, ConsoleAPI )
 

@@ -27,8 +27,8 @@ public:
 	IConsoleObject* Registration;
 
 	// UObject interface.
-	virtual void OnRegister() OVERRIDE;
-	virtual void OnUnregister() OVERRIDE;
+	virtual void OnRegister() override;
+	virtual void OnUnregister() override;
 
 private:
 
