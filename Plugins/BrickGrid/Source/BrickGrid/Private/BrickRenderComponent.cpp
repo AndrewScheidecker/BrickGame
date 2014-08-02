@@ -273,7 +273,7 @@ public:
 			#if UE4_HAS_LOD_CULLING_CHANGES
 				PDI->DrawMesh(GetMeshBatch(ElementIndex,NULL),Elements[ElementIndex].FaceIndex);
 			#else
-				PDI->DrawMesh(GetMeshBatch(ElementIndex,NULL),0,FLT_MAX);
+				PDI->DrawMesh(GetMeshBatch(ElementIndex,NULL),FLT_MAX);
 			#endif
 		}
 	}
