@@ -120,7 +120,7 @@ public:
 		DataType NewData;
 		NewData.PositionComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N);
 		NewData.TextureCoordinates.Add(STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N));
-		NewData.ColorComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N);
+		NewData.ColorComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_Color);
 		// Use a stride of 0 to use the same TangentX/TangentZ for all faces using this vertex factory.
 		NewData.TangentBasisComponents[0] = FVertexStreamComponent(&TangentBuffer,sizeof(FPackedNormal) * (2 * FaceIndex + 0),0,VET_PackedNormal);
 		NewData.TangentBasisComponents[1] = FVertexStreamComponent(&TangentBuffer,sizeof(FPackedNormal) * (2 * FaceIndex + 1),0,VET_PackedNormal);
@@ -187,7 +187,7 @@ public:
 	virtual void OnTransformChanged() override
 	{
 		// Create a uniform buffer with the transform for the chunk.
-		PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate(FScaleMatrix(FVector(255, 255, 255)) * GetLocalToWorld(), GetBounds(), GetLocalBounds(), true);
+		PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate(FScaleMatrix(FVector(255, 255, 255)) * GetLocalToWorld(), GetBounds(), GetLocalBounds(), true, UseEditorDepthTest());
 	}
 
 	virtual void DrawDynamicElements(FPrimitiveDrawInterface* PDI,const FSceneView* View) override
@@ -495,13 +495,13 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 			{
 				SurfaceMaterial = UMaterial::GetDefaultMaterial(MD_Surface);
 			}
-			SceneProxy->MaterialRelevance |= SurfaceMaterial->GetRelevance_Concurrent();
+			SceneProxy->MaterialRelevance |= SurfaceMaterial->GetRelevance_Concurrent(GetScene()->GetFeatureLevel());
 			const int32 ProxyMaterialIndex = SceneProxy->Materials.AddUnique(SurfaceMaterial);
 
 			UMaterialInterface* OverrideTopSurfaceMaterial = Grid->Parameters.Materials[BrickMaterialIndex].OverrideTopSurfaceMaterial;
 			if(OverrideTopSurfaceMaterial)
 			{
-				SceneProxy->MaterialRelevance |= OverrideTopSurfaceMaterial->GetRelevance_Concurrent();
+				SceneProxy->MaterialRelevance |= OverrideTopSurfaceMaterial->GetRelevance_Concurrent(GetScene()->GetFeatureLevel());
 			}
 			const int32 TopProxyMaterialIndex = OverrideTopSurfaceMaterial ? SceneProxy->Materials.AddUnique(OverrideTopSurfaceMaterial) : ProxyMaterialIndex;
 

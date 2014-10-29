@@ -106,8 +106,8 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 			const float DirtThickness = FMath::Max(0.0f,BaseDirtThickness * DirtThicknessFactor);
 			const float GroundHeight = RockHeight + DirtThickness;
 
-			const int32 BrickRockHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FMath::Ceil(RockHeight));
-			const int32 BrickGroundHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FMath::Ceil(GroundHeight));
+			const int32 BrickRockHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FPlatformMath::CeilToInt(RockHeight));
+			const int32 BrickGroundHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FPlatformMath::CeilToInt(GroundHeight));
 
 			float CavernProbabilitySamples[BrickGridConstants::MaxBricksPerRegionAxis];
 			const uint32 NumCavernProbabilitySamples = FMath::Min(BrickGridConstants::MaxBricksPerRegionAxis >> 2,(BrickGroundHeight + 3) >> 2);
