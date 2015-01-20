@@ -6,7 +6,7 @@
 namespace BrickGridConstants
 {
 	enum { MaxBricksPerRegionAxisLog2 = 7 };
-	enum { MaxBricksPerRegionAxis = 1 << MaxBricksPerRegionAxisLog2 };
+	enum { MaxBricksPerRegionAxis = 1 << MaxBricksPerRegionAxisLog2 };   
 };
 
 /** Shifts a number right with sign extension. */
@@ -26,19 +26,27 @@ inline int32 SignedShiftRight(int32 A,int32 B)
 	#endif
 }
 
+UENUM(BlueprintType)
+enum class EBrickFace : uint8
+{
+    BF_PlusZ UMETA(DisplayName = "PlusZ"),
+    BF_MinusZ UMETA(DisplayName = "MinusZ"),
+    BF_PlusX UMETA(DisplayName = "PlusX"),
+    BF_MinusX UMETA(DisplayName = "MinusX"),
+    BF_PlusY UMETA(DisplayName = "PlusY"),
+    BF_MinusY UMETA(DisplayName = "MinusY")
+};
+
 /** Information about a brick material. */
 USTRUCT(BlueprintType)
 struct FBrickMaterial
 {
-	GENERATED_USTRUCT_BODY()
+    GENERATED_USTRUCT_BODY()
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = Bricks)
-	class UMaterialInterface* SurfaceMaterial;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Bricks)
+    TArray<class UMaterialInterface*> FaceMaterials;
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = Bricks)
-	class UMaterialInterface* OverrideTopSurfaceMaterial;
-
-	FBrickMaterial() : SurfaceMaterial(NULL), OverrideTopSurfaceMaterial(NULL) {}
+    FBrickMaterial() {}
 };
 
 /** Information about a brick. */
@@ -157,7 +165,7 @@ struct FBrickRegion
 
 	// Contains the material index for each brick, stored in an 8-bit integer.
 	UPROPERTY()
-	TArray<uint8> BrickContents;
+    TArray<uint16> BrickContents;
 
 	// Contains the occupied brick with highest Z in this region for each XY coordinate in the region. -1 means no non-empty bricks in this region at that XY.
 	TArray<int8> MaxNonEmptyBrickRegionZs;
@@ -170,11 +178,11 @@ struct FBrickGridParameters
 	GENERATED_USTRUCT_BODY()
 
 	// The materials to render for each brick material.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Materials)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Materials)
 	TArray<FBrickMaterial> Materials;
 
 	// The material index that means "empty".
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Materials)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Materials)
 	int32 EmptyMaterialIndex;
 
 	// The number of bricks along each axis of a region is 2^BricksPerChunkLog2
@@ -242,8 +250,8 @@ public:
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	BRICKGRID_API FBrick GetBrick(const FInt3& BrickCoordinates) const;
 
-	BRICKGRID_API void GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint8>& OutBrickMaterials) const;
-	BRICKGRID_API void SetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,const TArray<uint8>& BrickMaterials);
+	BRICKGRID_API void GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint16>& OutBrickMaterials) const;
+	BRICKGRID_API void SetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,const TArray<uint16>& BrickMaterials);
 
 	// Returns a height-map containing the non-empty brick with greatest Z for each XY in the rectangle bounded by MinBrickCoordinates.XY-MaxBrickCoordinates.XY.
 	// The returned heights are relative to MinBrickCoordinates.Z, but MaxBrickCoordinates.Z is ignored.

@@ -95,7 +95,7 @@ FBrick UBrickGridComponent::GetBrick(const FInt3& BrickCoordinates) const
 	return FBrick(Parameters.EmptyMaterialIndex);
 }
 
-void UBrickGridComponent::GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint8>& OutBrickMaterials) const
+void UBrickGridComponent::GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint16>& OutBrickMaterials) const
 {
 	const FInt3 OutputSize = MaxBrickCoordinates - MinBrickCoordinates + FInt3::Scalar(1);
 	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
@@ -123,11 +123,11 @@ void UBrickGridComponent::GetBrickMaterialArray(const FInt3& MinBrickCoordinates
 						const uint32 RegionBaseBrickIndex = (((RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX) << Parameters.BricksPerRegionLog2.Z) + MinOutputRegionBrickCoordinates.Z;
 						if(RegionIndex)
 						{
-							FMemory::Memcpy(&OutBrickMaterials[OutputBaseBrickIndex],&Regions[*RegionIndex].BrickContents[RegionBaseBrickIndex],OutputSizeZ * sizeof(uint8));
+                            FMemory::Memcpy(&OutBrickMaterials[OutputBaseBrickIndex], &Regions[*RegionIndex].BrickContents[RegionBaseBrickIndex], OutputSizeZ * sizeof(OutBrickMaterials[0]));
 						}
 						else
 						{
-							FMemory::Memset(&OutBrickMaterials[OutputBaseBrickIndex],Parameters.EmptyMaterialIndex,OutputSizeZ * sizeof(uint8));
+                            FMemory::Memset(&OutBrickMaterials[OutputBaseBrickIndex], Parameters.EmptyMaterialIndex, OutputSizeZ * sizeof(OutBrickMaterials[0]));
 						}
 					}
 				}
@@ -136,7 +136,7 @@ void UBrickGridComponent::GetBrickMaterialArray(const FInt3& MinBrickCoordinates
 	}
 }
 
-void UBrickGridComponent::SetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,const TArray<uint8>& BrickMaterials)
+void UBrickGridComponent::SetBrickMaterialArray(const FInt3& MinBrickCoordinates, const FInt3& MaxBrickCoordinates, const TArray<uint16>& BrickMaterials)
 {
 	const FInt3 InputSize = MaxBrickCoordinates - MinBrickCoordinates + FInt3::Scalar(1);
 	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
@@ -164,7 +164,7 @@ void UBrickGridComponent::SetBrickMaterialArray(const FInt3& MinBrickCoordinates
 						const uint32 RegionBaseBrickIndex = (((RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX) << Parameters.BricksPerRegionLog2.Z) + MinInputRegionBrickCoordinates.Z;
 						if(RegionIndex)
 						{
-							FMemory::Memcpy(&Regions[*RegionIndex].BrickContents[RegionBaseBrickIndex],&BrickMaterials[InputBaseBrickIndex],InputSizeZ * sizeof(uint8));
+                            FMemory::Memcpy(&Regions[*RegionIndex].BrickContents[RegionBaseBrickIndex], &BrickMaterials[InputBaseBrickIndex], InputSizeZ * sizeof(BrickMaterials[0]));
 						}
 					}
 				}
@@ -519,7 +519,7 @@ FBrickGridParameters::FBrickGridParameters()
 	Materials.Add(FBrickMaterial());
 }
 
-UBrickGridComponent::UBrickGridComponent(const FPostConstructInitializeProperties& PCIP)
+UBrickGridComponent::UBrickGridComponent(const FObjectInitializer& PCIP)
 : Super( PCIP )
 {
 	PrimaryComponentTick.bStartWithTickEnabled =true;

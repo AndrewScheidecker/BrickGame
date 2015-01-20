@@ -15,7 +15,7 @@ static const FInt3 FaceNormals[6] =
 	FInt3(0, 0, +1)
 };
 
-UBrickCollisionComponent::UBrickCollisionComponent( const FPostConstructInitializeProperties& PCIP )
+UBrickCollisionComponent::UBrickCollisionComponent(const FObjectInitializer& PCIP)
 	: Super( PCIP )
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -65,7 +65,7 @@ void UBrickCollisionComponent::UpdateCollisionBody()
 
 	// Read the brick materials for all the bricks that affect this chunk.
 	const FInt3 LocalBricksDim = Grid->BricksPerCollisionChunk + LocalBrickExpansion * FInt3::Scalar(2);
-	TArray<uint8> LocalBrickMaterials;
+	TArray<uint16> LocalBrickMaterials;
 	LocalBrickMaterials.Init(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
 	Grid->GetBrickMaterialArray(MinLocalBrickCoordinates,MinLocalBrickCoordinates + LocalBricksDim - FInt3::Scalar(1),LocalBrickMaterials);
 
