@@ -6,7 +6,7 @@ static void ComputeChunkAO(
 	const FInt3 LocalBrickExpansion,
 	const FInt3 LocalBricksDim,
 	const FInt3 LocalVertexDim,
-	const TArray<uint8>& LocalBrickMaterials,
+	const TArray<uint16>& LocalBrickMaterials,
 	TArray<uint8>& OutLocalVertexAmbientFactors
 	)
 {

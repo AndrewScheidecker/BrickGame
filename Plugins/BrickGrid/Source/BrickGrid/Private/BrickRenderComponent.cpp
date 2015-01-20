@@ -59,7 +59,7 @@ public:
 			VertexBufferRHI = RHICreateVertexBuffer(Vertices.Num() * sizeof(FBrickVertex), BUF_Dynamic, CreateInfo);
 			// Copy the vertex data into the vertex buffer.
 			void* VertexBufferData = RHILockVertexBuffer(VertexBufferRHI, 0, Vertices.Num() * sizeof(FBrickVertex), RLM_WriteOnly);
-			FMemory::Memcpy(VertexBufferData, Vertices.GetTypedData(), Vertices.Num() * sizeof(FBrickVertex));
+		        FMemory::Memcpy(VertexBufferData, Vertices.GetData(), Vertices.Num() * sizeof(FBrickVertex));
 			RHIUnlockVertexBuffer(VertexBufferRHI);
 		}
 	}
@@ -78,7 +78,7 @@ public:
 			IndexBufferRHI = RHICreateIndexBuffer(sizeof(uint16), Indices.Num() * sizeof(uint16), BUF_Static, CreateInfo);
 			// Write the indices to the index buffer.
 			void* Buffer = RHILockIndexBuffer(IndexBufferRHI, 0, Indices.Num() * sizeof(uint16), RLM_WriteOnly);
-			FMemory::Memcpy(Buffer, Indices.GetTypedData(), Indices.Num() * sizeof(uint16));
+		        FMemory::Memcpy(Buffer, Indices.GetData(), Indices.Num() * sizeof(uint16));
 			RHIUnlockIndexBuffer(IndexBufferRHI);
 		}
 	}
@@ -190,7 +190,7 @@ public:
 		PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate(FScaleMatrix(FVector(255, 255, 255)) * GetLocalToWorld(), GetBounds(), GetLocalBounds(), true, UseEditorDepthTest());
 	}
 
-	virtual void DrawDynamicElements(FPrimitiveDrawInterface* PDI,const FSceneView* View) override
+	virtual void DrawDynamicElements(FPrimitiveDrawInterface* PDI,const FSceneView* View)
 	{
 		// Set up the wireframe material Face.
 		FColoredMaterialRenderProxy WireframeMaterialFace(
@@ -318,7 +318,7 @@ public:
 	}
 };
 
-UBrickRenderComponent::UBrickRenderComponent( const FPostConstructInitializeProperties& PCIP )
+UBrickRenderComponent::UBrickRenderComponent(const FObjectInitializer& PCIP)
 	: Super( PCIP )
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -354,7 +354,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 	// Read the brick materials for all the bricks that affect this chunk.
 	const FInt3 LocalBricksDim = Grid->BricksPerRenderChunk + LocalBrickExpansion * FInt3::Scalar(2);
-	TArray<uint8> LocalBrickMaterials;
+	TArray<uint16> LocalBrickMaterials;
 	LocalBrickMaterials.Init(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
 	Grid->GetBrickMaterialArray(MinLocalBrickCoordinates,MinLocalBrickCoordinates + LocalBricksDim - FInt3::Scalar(1),LocalBrickMaterials);
 
@@ -440,7 +440,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 				{
 					// Only draw faces of bricks that aren't empty.
 					const uint32 LocalBrickIndex = (LocalBrickY * LocalBricksDim.X + LocalBrickX) * LocalBricksDim.Z + LocalBrickZ;
-					const uint8 BrickMaterial = LocalBrickMaterials[LocalBrickIndex];
+					const uint16 BrickMaterial = LocalBrickMaterials[LocalBrickIndex];
 					if (BrickMaterial != EmptyMaterialIndex)
 					{
 						const FInt3 RelativeBrickCoordinates = FInt3(LocalBrickX,LocalBrickY,LocalBrickZ) - LocalBrickExpansion;
@@ -488,32 +488,31 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 			}
 		}
 		SceneProxy->IndexBuffer.Indices.Empty(NumIndices);
+
+	        UMaterialInterface* defaultMaterial = UMaterial::GetDefaultMaterial(MD_Surface);
+
+	        // Setup materials for the faces
 		for(int32 BrickMaterialIndex = 0; BrickMaterialIndex < MaterialBatches.Num(); ++BrickMaterialIndex)
 		{
-			UMaterialInterface* SurfaceMaterial = Grid->Parameters.Materials[BrickMaterialIndex].SurfaceMaterial;
-			if(SurfaceMaterial == NULL)
-			{
-				SurfaceMaterial = UMaterial::GetDefaultMaterial(MD_Surface);
-			}
-			SceneProxy->MaterialRelevance |= SurfaceMaterial->GetRelevance_Concurrent(GetScene()->GetFeatureLevel());
-			const int32 ProxyMaterialIndex = SceneProxy->Materials.AddUnique(SurfaceMaterial);
-
-			UMaterialInterface* OverrideTopSurfaceMaterial = Grid->Parameters.Materials[BrickMaterialIndex].OverrideTopSurfaceMaterial;
-			if(OverrideTopSurfaceMaterial)
-			{
-				SceneProxy->MaterialRelevance |= OverrideTopSurfaceMaterial->GetRelevance_Concurrent(GetScene()->GetFeatureLevel());
-			}
-			const int32 TopProxyMaterialIndex = OverrideTopSurfaceMaterial ? SceneProxy->Materials.AddUnique(OverrideTopSurfaceMaterial) : ProxyMaterialIndex;
-
+        		TArray<class UMaterialInterface*>& faceMaterials = Grid->Parameters.Materials[BrickMaterialIndex].FaceMaterials;            
 			for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
-			{
+			{                
+		                UMaterialInterface* faceMaterial = (faceMaterials.Num() > 0) ? faceMaterials[0] : defaultMaterial;
+                		if (faceMaterials.Num() > 0 && FaceIndex < (uint32)(faceMaterials.Num()))
+		                {
+                		    faceMaterial = faceMaterials[FaceIndex];
+		                }
+                		auto relevance = faceMaterial->GetRelevance(GetScene()->GetFeatureLevel());
+		                SceneProxy->MaterialRelevance |= relevance;
+
+		                const int32 ProxyMaterialIndex = SceneProxy->Materials.AddUnique(faceMaterial);
 				const FFaceBatch& FaceBatch = MaterialBatches[BrickMaterialIndex].FaceBatches[FaceIndex];
 				if (FaceBatch.Indices.Num() > 0)
 				{
 					FBrickChunkSceneProxy::FElement& Element = *new(SceneProxy->Elements)FBrickChunkSceneProxy::FElement;
 					Element.FirstIndex = SceneProxy->IndexBuffer.Indices.Num();
 					Element.NumPrimitives = FaceBatch.Indices.Num() / 3;
-					Element.MaterialIndex = FaceIndex == 5 ? TopProxyMaterialIndex : ProxyMaterialIndex;
+					Element.MaterialIndex = ProxyMaterialIndex;
 					Element.FaceIndex = FaceIndex;
 
 					// Append the batch's indices to the index buffer.
