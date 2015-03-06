@@ -59,7 +59,7 @@ public:
 			VertexBufferRHI = RHICreateVertexBuffer(Vertices.Num() * sizeof(FBrickVertex), BUF_Dynamic, CreateInfo);
 			// Copy the vertex data into the vertex buffer.
 			void* VertexBufferData = RHILockVertexBuffer(VertexBufferRHI, 0, Vertices.Num() * sizeof(FBrickVertex), RLM_WriteOnly);
-			FMemory::Memcpy(VertexBufferData, Vertices.GetTypedData(), Vertices.Num() * sizeof(FBrickVertex));
+			FMemory::Memcpy(VertexBufferData, Vertices.GetData(), Vertices.Num() * sizeof(FBrickVertex));
 			RHIUnlockVertexBuffer(VertexBufferRHI);
 		}
 	}
@@ -78,7 +78,7 @@ public:
 			IndexBufferRHI = RHICreateIndexBuffer(sizeof(uint16), Indices.Num() * sizeof(uint16), BUF_Static, CreateInfo);
 			// Write the indices to the index buffer.
 			void* Buffer = RHILockIndexBuffer(IndexBufferRHI, 0, Indices.Num() * sizeof(uint16), RLM_WriteOnly);
-			FMemory::Memcpy(Buffer, Indices.GetTypedData(), Indices.Num() * sizeof(uint16));
+			FMemory::Memcpy(Buffer, Indices.GetData(), Indices.Num() * sizeof(uint16));
 			RHIUnlockIndexBuffer(IndexBufferRHI);
 		}
 	}
@@ -96,10 +96,10 @@ public:
 		FPackedNormal* TangentBufferData = (FPackedNormal*)RHILockVertexBuffer(VertexBufferRHI, 0, 12 * sizeof(FPackedNormal), RLM_WriteOnly);
 		for(int32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 		{
-			const FVector UnprojectedTangentX = FVector(+1,-1,0).SafeNormal();
+			const FVector UnprojectedTangentX = FVector(+1,-1,0).GetSafeNormal();
 			const FVector UnprojectedTangentY(-1,-1,-1);
 			const FVector FaceNormal = FaceNormals[FaceIndex].ToFloat();
-			const FVector ProjectedFaceTangentX = (UnprojectedTangentX - FaceNormal * (UnprojectedTangentX | FaceNormal)).SafeNormal();
+			const FVector ProjectedFaceTangentX = (UnprojectedTangentX - FaceNormal * (UnprojectedTangentX | FaceNormal)).GetSafeNormal();
 			*TangentBufferData++ = FPackedNormal(ProjectedFaceTangentX);
 			*TangentBufferData++ = FPackedNormal(FVector4(FaceNormal, FMath::Sign(UnprojectedTangentY | (FaceNormal ^ ProjectedFaceTangentX))));
 		}
@@ -190,18 +190,28 @@ public:
 		PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate(FScaleMatrix(FVector(255, 255, 255)) * GetLocalToWorld(), GetBounds(), GetLocalBounds(), true, UseEditorDepthTest());
 	}
 
-	virtual void DrawDynamicElements(FPrimitiveDrawInterface* PDI,const FSceneView* View) override
+	virtual void GetDynamicMeshElements(const TArray<const FSceneView*>& Views,const FSceneViewFamily& ViewFamily,uint32 VisibilityMap,class FMeshElementCollector& Collector) const override
 	{
 		// Set up the wireframe material Face.
-		FColoredMaterialRenderProxy WireframeMaterialFace(
+		auto WireframeMaterialFace = new FColoredMaterialRenderProxy(
 			WITH_EDITOR ? GEngine->WireframeMaterial->GetRenderProxy(IsSelected()) : NULL,
 			FLinearColor(0, 0.5f, 1.f)
 			);
+		Collector.RegisterOneFrameMaterialProxy(WireframeMaterialFace);
 
-		// Draw the mesh elements.
+		// Draw the mesh elements in each view they are visible.
 		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
-			PDI->DrawMesh(GetMeshBatch(ElementIndex, View->Family->EngineShowFlags.Wireframe ? &WireframeMaterialFace : NULL));
+			FMeshBatch& Batch = Collector.AllocateMesh();
+			InitMeshBatch(Batch,ElementIndex,ViewFamily.EngineShowFlags.Wireframe ? WireframeMaterialFace : NULL);
+
+			for(int32 ViewIndex = 0;ViewIndex < Views.Num();++ViewIndex)
+			{
+				if(VisibilityMap & (1 << ViewIndex))
+				{
+					Collector.AddMesh(ViewIndex,Batch);
+				}
+			}
 		}
 	}
 
@@ -270,10 +280,12 @@ public:
 	{
 		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
+			FMeshBatch Batch;
+			InitMeshBatch(Batch,ElementIndex,NULL);
 			#if UE4_HAS_LOD_CULLING_CHANGES
-				PDI->DrawMesh(GetMeshBatch(ElementIndex,NULL),Elements[ElementIndex].FaceIndex);
+				PDI->DrawMesh(Batch,Elements[ElementIndex].FaceIndex);
 			#else
-				PDI->DrawMesh(GetMeshBatch(ElementIndex,NULL),FLT_MAX);
+				PDI->DrawMesh(Batch,FLT_MAX);
 			#endif
 		}
 	}
@@ -297,29 +309,27 @@ public:
 	virtual uint32 GetMemoryFootprint(void) const { return(sizeof(*this) + GetAllocatedSize()); }
 	uint32 GetAllocatedSize( void ) const { return( FPrimitiveSceneProxy::GetAllocatedSize() ); }
 
-	FMeshBatch GetMeshBatch(int32 ElementIndex,FMaterialRenderProxy* WireframeMaterialFace)
+	void InitMeshBatch(FMeshBatch& OutBatch,int32 ElementIndex,FMaterialRenderProxy* WireframeMaterialFace) const
 	{
 		const FElement& Element = Elements[ElementIndex];
-		FMeshBatch Mesh;
-		Mesh.bWireframe = WireframeMaterialFace != NULL;
-		Mesh.VertexFactory = &VertexFactories[Element.FaceIndex];
-		Mesh.MaterialRenderProxy = WireframeMaterialFace ? WireframeMaterialFace : Materials[Element.MaterialIndex]->GetRenderProxy(IsSelected());
-		Mesh.ReverseCulling = IsLocalToWorldDeterminantNegative();
-		Mesh.Type = PT_TriangleList;
-		Mesh.DepthPriorityGroup = SDPG_World;
-		Mesh.CastShadow = true;
-		Mesh.Elements[0].FirstIndex = Element.FirstIndex;
-		Mesh.Elements[0].NumPrimitives = Element.NumPrimitives;
-		Mesh.Elements[0].MinVertexIndex = 0;
-		Mesh.Elements[0].MaxVertexIndex = VertexBuffer.Vertices.Num() - 1;
-		Mesh.Elements[0].IndexBuffer = &IndexBuffer;
-		Mesh.Elements[0].PrimitiveUniformBuffer = PrimitiveUniformBuffer;
-		return Mesh;
+		OutBatch.bWireframe = WireframeMaterialFace != NULL;
+		OutBatch.VertexFactory = &VertexFactories[Element.FaceIndex];
+		OutBatch.MaterialRenderProxy = WireframeMaterialFace ? WireframeMaterialFace : Materials[Element.MaterialIndex]->GetRenderProxy(IsSelected());
+		OutBatch.ReverseCulling = IsLocalToWorldDeterminantNegative();
+		OutBatch.Type = PT_TriangleList;
+		OutBatch.DepthPriorityGroup = SDPG_World;
+		OutBatch.CastShadow = true;
+		OutBatch.Elements[0].FirstIndex = Element.FirstIndex;
+		OutBatch.Elements[0].NumPrimitives = Element.NumPrimitives;
+		OutBatch.Elements[0].MinVertexIndex = 0;
+		OutBatch.Elements[0].MaxVertexIndex = VertexBuffer.Vertices.Num() - 1;
+		OutBatch.Elements[0].IndexBuffer = &IndexBuffer;
+		OutBatch.Elements[0].PrimitiveUniformBuffer = PrimitiveUniformBuffer;
 	}
 };
 
-UBrickRenderComponent::UBrickRenderComponent( const FPostConstructInitializeProperties& PCIP )
-	: Super( PCIP )
+UBrickRenderComponent::UBrickRenderComponent( const FObjectInitializer& Initializer )
+	: Super( Initializer )
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	CastShadow = true;

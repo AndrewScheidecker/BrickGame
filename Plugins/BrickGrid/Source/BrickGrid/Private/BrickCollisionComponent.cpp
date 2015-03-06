@@ -15,8 +15,8 @@ static const FInt3 FaceNormals[6] =
 	FInt3(0, 0, +1)
 };
 
-UBrickCollisionComponent::UBrickCollisionComponent( const FPostConstructInitializeProperties& PCIP )
-	: Super( PCIP )
+UBrickCollisionComponent::UBrickCollisionComponent( const FObjectInitializer& Initializer)
+	: Super(Initializer)
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	bVisible = true;

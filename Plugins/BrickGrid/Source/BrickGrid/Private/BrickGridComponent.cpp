@@ -519,8 +519,8 @@ FBrickGridParameters::FBrickGridParameters()
 	Materials.Add(FBrickMaterial());
 }
 
-UBrickGridComponent::UBrickGridComponent(const FPostConstructInitializeProperties& PCIP)
-: Super( PCIP )
+UBrickGridComponent::UBrickGridComponent(const FObjectInitializer& Initializer)
+: Super(Initializer)
 {
 	PrimaryComponentTick.bStartWithTickEnabled =true;
 
