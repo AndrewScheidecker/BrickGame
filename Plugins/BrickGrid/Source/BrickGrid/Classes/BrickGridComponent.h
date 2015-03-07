@@ -113,7 +113,7 @@ struct FInt3
 	}
 	static inline FInt3 CeilLog2(const FInt3& A)
 	{
-		return FInt3(FMath::CeilLogTwo(A.X),FMath::CeilLogTwo(A.Z),FMath::CeilLogTwo(A.Z));
+		return FInt3(FMath::CeilLogTwo(A.X),FMath::CeilLogTwo(A.Y),FMath::CeilLogTwo(A.Z));
 	}
 	static inline FInt3 Max(const FInt3& A,const FInt3& B)
 	{
