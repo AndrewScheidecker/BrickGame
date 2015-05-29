@@ -38,7 +38,7 @@ public:
     /// <returns></returns>
     float Generate(float x)
     {
-        int32 i0 = FMath::Floor(x);
+        int32 i0 = FMath::FloorToInt(x);
         int32 i1 = i0 + 1;
         float x0 = x - i0;
         float x1 = x0 - 1.0f;
@@ -74,8 +74,8 @@ public:
         float s = (x+y)*F2; // Hairy factor for 2D
         float xs = x + s;
         float ys = y + s;
-        int32 i = FMath::Floor(xs);
-        int32 j = FMath::Floor(ys);
+        int32 i = FMath::FloorToInt(xs);
+        int32 j = FMath::FloorToInt(ys);
 
         float t = (float)(i+j)*G2;
         float X0 = i-t; // Unskew the cell origin back to (x,y) space
@@ -143,9 +143,9 @@ public:
         float xs = x+s;
         float ys = y+s;
         float zs = z+s;
-        int32 i = FMath::Floor(xs);
-        int32 j = FMath::Floor(ys);
-        int32 k = FMath::Floor(zs);
+        int32 i = FMath::FloorToInt(xs);
+        int32 j = FMath::FloorToInt(ys);
+        int32 k = FMath::FloorToInt(zs);
 
         float t = (float)(i+j+k)*G3; 
         float X0 = i-t; // Unskew the cell origin back to (x,y,z) space
