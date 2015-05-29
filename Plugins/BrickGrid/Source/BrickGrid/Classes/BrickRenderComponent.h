@@ -6,7 +6,7 @@
 
 /** Represents rendering for a chunk of a BrickGridComponent. */
 UCLASS(hidecategories=(Object,LOD,Physics), editinlinenew, ClassGroup=Rendering)
-class UBrickRenderComponent : public UPrimitiveComponent
+class BRICKGRID_API UBrickRenderComponent : public UPrimitiveComponent
 {
 	GENERATED_UCLASS_BODY()
 

@@ -9,7 +9,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMultiCastConsoleCommandDelegate);
 
 // A struct that encapsulates a persistent console command registration.
 UCLASS(hidecategories=(Object), editinlinenew, meta=(BlueprintSpawnableComponent), ClassGroup=Utility)
-class UConsoleCommand : public UActorComponent
+class CONSOLEAPI_API UConsoleCommand : public UActorComponent
 {
 public:
 

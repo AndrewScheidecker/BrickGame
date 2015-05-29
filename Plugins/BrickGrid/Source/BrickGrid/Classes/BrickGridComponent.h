@@ -220,7 +220,7 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FBrickGrid_InitRegion,FInt3,RegionCoordinates)
 
 /** A 3D grid of bricks. */
 UCLASS(hidecategories=(Object,LOD, Physics), editinlinenew, meta=(BlueprintSpawnableComponent), ClassGroup=Rendering)
-class UBrickGridComponent : public USceneComponent
+class BRICKGRID_API UBrickGridComponent : public USceneComponent
 {
 	GENERATED_UCLASS_BODY()
 
@@ -232,35 +232,35 @@ public:
 
 	// Returns a copy of the grid's brick data.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API FBrickGridData GetData() const;
+	FBrickGridData GetData() const;
 
 	// Sets the grid's brick data.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API void SetData(const FBrickGridData& Data);
+	void SetData(const FBrickGridData& Data);
 
 	// Reads the brick at the given coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API FBrick GetBrick(const FInt3& BrickCoordinates) const;
+	FBrick GetBrick(const FInt3& BrickCoordinates) const;
 
-	BRICKGRID_API void GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint8>& OutBrickMaterials) const;
-	BRICKGRID_API void SetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,const TArray<uint8>& BrickMaterials);
+	void GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint8>& OutBrickMaterials) const;
+	void SetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,const TArray<uint8>& BrickMaterials);
 
 	// Returns a height-map containing the non-empty brick with greatest Z for each XY in the rectangle bounded by MinBrickCoordinates.XY-MaxBrickCoordinates.XY.
 	// The returned heights are relative to MinBrickCoordinates.Z, but MaxBrickCoordinates.Z is ignored.
 	// OutHeightmap should be allocated by the caller to contain an int8 for each XY in the rectangle, and is indexed by OutHeightMap[Y * SizeX + X].
-	BRICKGRID_API void GetMaxNonEmptyBrickZ(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<int8>& OutHeightMap) const;
+	void GetMaxNonEmptyBrickZ(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<int8>& OutHeightMap) const;
 
 	// Writes the brick at the given coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API bool SetBrick(const FInt3& BrickCoordinates,int32 MaterialIndex);
+	bool SetBrick(const FInt3& BrickCoordinates,int32 MaterialIndex);
 
 	// Invalidates the chunk components for a range of brick coordinates.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API void InvalidateChunkComponents(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates);
+	void InvalidateChunkComponents(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates);
 
 	// Updates the visible chunks for a given view position.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
-	BRICKGRID_API void Update(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,float MaxDesiredUpdateTime,FBrickGrid_InitRegion InitRegion);
+	void Update(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,float MaxDesiredUpdateTime,FBrickGrid_InitRegion InitRegion);
 
 	// The parameters for the grid.
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")

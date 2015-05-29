@@ -15,5 +15,5 @@ public:
 
 	// Resets the runaway loop counter to avoid BluePrint "runaway loop" errors.
 	UFUNCTION(BlueprintCallable,Category="Control flow")
-	static void ResetRunawayLoopCounter();
+	static SUPERLOOPLIBRARY_API void ResetRunawayLoopCounter();
 };

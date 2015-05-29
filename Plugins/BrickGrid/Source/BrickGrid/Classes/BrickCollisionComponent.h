@@ -6,7 +6,7 @@
 
 /** Represents collision for a chunk of a BrickGridComponent. */
 UCLASS(hidecategories=(Object,LOD,Physics), editinlinenew, ClassGroup=Collision)
-class UBrickCollisionComponent : public UPrimitiveComponent
+class BRICKGRID_API UBrickCollisionComponent : public UPrimitiveComponent
 {
 	GENERATED_UCLASS_BODY()
 
