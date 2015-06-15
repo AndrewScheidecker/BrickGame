@@ -12,6 +12,8 @@
 /Plugins/**/Binaries/**
 /Binaries/**
 /DerivedDataCache/**
+/Images
+/Videos
 
 **.generated.h
 **.response

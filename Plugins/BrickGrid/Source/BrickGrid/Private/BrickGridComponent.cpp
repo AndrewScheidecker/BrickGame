@@ -410,7 +410,6 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 			ChunkIt.RemoveCurrent();
 		}
 	}
-	int32 NumLowPriorityRenderChunkUpdates = 0;
 	for(int32 ChunkZ = BrickToRenderChunkCoordinates(MinBrickCoordinates).Z;ChunkZ <= BrickToRenderChunkCoordinates(MaxBrickCoordinates).Z && (FPlatformTime::Seconds() - StartTime) < MaxDesiredUpdateTime;++ChunkZ)
 	{
 		for(int32 ChunkY = MinRenderChunkCoordinates.Y;ChunkY <= MaxRenderChunkCoordinates.Y && (FPlatformTime::Seconds() - StartTime) < MaxDesiredUpdateTime;++ChunkY)
@@ -443,7 +442,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 						RenderChunkCoordinatesToComponent.Add(ChunkCoordinates,RenderComponent);
 					}
 
-					// Flush low-priority pending updates to render components up to some per-frame limit.
+					// Flush low-priority pending updates to render components.
 					if(RenderComponent->HasLowPriorityUpdatePending)
 					{
 						RenderComponent->MarkRenderStateDirty();
