@@ -87,7 +87,7 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 	// Allocate a local array for the generated bricks.
 	const FInt3 BricksPerRegion = Grid->BricksPerRegion;
 	TArray<uint8> LocalBrickMaterials;
-	LocalBrickMaterials.Init(BricksPerRegion.X * BricksPerRegion.Y * BricksPerRegion.Z);
+	LocalBrickMaterials.SetNumUninitialized(BricksPerRegion.X * BricksPerRegion.Y * BricksPerRegion.Z);
 
 	const FInt3 MinRegionBrickCoordinates = RegionCoordinates * BricksPerRegion;
 	const FInt3 MaxRegionBrickCoordinates = MinRegionBrickCoordinates + BricksPerRegion - FInt3::Scalar(1);
