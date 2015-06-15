@@ -4,8 +4,8 @@
 #include "BrickGameGameMode.h"
 #include "BrickGameHUD.h"
 
-ABrickGameGameMode::ABrickGameGameMode(const class FPostConstructInitializeProperties& PCIP)
-	: Super(PCIP)
+ABrickGameGameMode::ABrickGameGameMode(const class FObjectInitializer& Initializer)
+	: Super(Initializer)
 {
 	// use our custom HUD class
 	HUDClass = ABrickGameHUD::StaticClass();

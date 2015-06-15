@@ -4,7 +4,7 @@
 
 IMPLEMENT_MODULE( IModuleInterface, SuperLoopLibrary )
 
-USuperLoopLibrary::USuperLoopLibrary(const class FPostConstructInitializeProperties& PCIP) : Super(PCIP) {}
+USuperLoopLibrary::USuperLoopLibrary(const class FObjectInitializer& Initializer) : Super(Initializer) {}
 
 void USuperLoopLibrary::ResetRunawayLoopCounter()
 {

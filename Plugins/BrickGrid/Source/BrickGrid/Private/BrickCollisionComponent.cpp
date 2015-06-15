@@ -21,9 +21,7 @@ UBrickCollisionComponent::UBrickCollisionComponent( const FObjectInitializer& In
 	PrimaryComponentTick.bCanEverTick = false;
 	bVisible = true;
 	bAutoRegister = false;
-
-	CollisionBodySetup = ConstructObject<UBodySetup>(UBodySetup::StaticClass(), this);
-	CollisionBodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
+	
 	SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
 }
 
@@ -55,6 +53,12 @@ class UBodySetup* UBrickCollisionComponent::GetBodySetup()
 void UBrickCollisionComponent::UpdateCollisionBody()
 {
 	const double StartTime = FPlatformTime::Seconds();
+	
+	if (!CollisionBodySetup)
+	{
+		CollisionBodySetup = NewObject<UBodySetup>(this);
+		CollisionBodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
+	}
 
 	CollisionBodySetup->AggGeom.BoxElems.Reset();
 
@@ -66,7 +70,7 @@ void UBrickCollisionComponent::UpdateCollisionBody()
 	// Read the brick materials for all the bricks that affect this chunk.
 	const FInt3 LocalBricksDim = Grid->BricksPerCollisionChunk + LocalBrickExpansion * FInt3::Scalar(2);
 	TArray<uint8> LocalBrickMaterials;
-	LocalBrickMaterials.Init(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
+	LocalBrickMaterials.SetNumUninitialized(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
 	Grid->GetBrickMaterialArray(MinLocalBrickCoordinates,MinLocalBrickCoordinates + LocalBricksDim - FInt3::Scalar(1),LocalBrickMaterials);
 
 	// Iterate over each brick in the chunk.

@@ -5,8 +5,8 @@
 #include "BrickGridComponent.h"
 #include "SimplexNoise.h"
 
-UBrickTerrainGenerationLibrary::UBrickTerrainGenerationLibrary( const FPostConstructInitializeProperties& PCIP )
-: Super( PCIP )
+UBrickTerrainGenerationLibrary::UBrickTerrainGenerationLibrary( const FObjectInitializer& Initializer )
+: Super(Initializer)
 {}
 
 class FLocalNoiseFunction : public FNoiseFunction

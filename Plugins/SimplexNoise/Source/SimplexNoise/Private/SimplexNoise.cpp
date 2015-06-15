@@ -25,7 +25,7 @@ class FSimplexNoise : public ISimplexNoise
 IMPLEMENT_MODULE( FSimplexNoise, SimplexNoise )
 
 // BluePrint-accessible interface
-USimplexNoiseLibrary::USimplexNoiseLibrary(const class FPostConstructInitializeProperties& PCIP) : Super(PCIP) {}
+USimplexNoiseLibrary::USimplexNoiseLibrary(const class FObjectInitializer& Initializer) : Super(Initializer) {}
 float USimplexNoiseLibrary::Sample(float X)
 {
 	return Implementation.Generate(X);

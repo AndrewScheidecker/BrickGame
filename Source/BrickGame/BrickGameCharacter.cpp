@@ -6,19 +6,19 @@
 //////////////////////////////////////////////////////////////////////////
 // ABrickGameCharacter
 
-ABrickGameCharacter::ABrickGameCharacter(const class FPostConstructInitializeProperties& PCIP)
-	: Super(PCIP)
+ABrickGameCharacter::ABrickGameCharacter(const class FObjectInitializer& Initializer)
+	: Super(Initializer)
 {
 	// Set size for collision capsule
-	CapsuleComponent->InitCapsuleSize(42.f, 96.0f);
+	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
 	// set our turn rates for input
 	BaseTurnRate = 45.f;
 	BaseLookUpRate = 45.f;
 
 	// Create a CameraComponent	
-	FirstPersonCameraComponent = PCIP.CreateDefaultSubobject<UCameraComponent>(this, TEXT("FirstPersonCamera"));
-	FirstPersonCameraComponent->AttachParent = CapsuleComponent;
+	FirstPersonCameraComponent = Initializer.CreateDefaultSubobject<UCameraComponent>(this, TEXT("FirstPersonCamera"));
+	FirstPersonCameraComponent->AttachParent = GetCapsuleComponent();
 	FirstPersonCameraComponent->RelativeLocation = FVector(0, 0, 64.f); // Position the camera
 }
 

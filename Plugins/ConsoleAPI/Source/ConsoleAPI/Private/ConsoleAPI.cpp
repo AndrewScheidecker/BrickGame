@@ -4,7 +4,7 @@
 
 IMPLEMENT_MODULE( IModuleInterface, ConsoleAPI )
 
-UConsoleCommand::UConsoleCommand(const class FPostConstructInitializeProperties& PCIP) : Super(PCIP), Registration(NULL) {}
+UConsoleCommand::UConsoleCommand(const class FObjectInitializer& Initializer) : Super(Initializer), Registration(NULL) {}
 
 void UConsoleCommand::OnRegister()
 {

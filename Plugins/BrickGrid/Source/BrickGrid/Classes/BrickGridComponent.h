@@ -170,35 +170,35 @@ struct FBrickGridParameters
 	GENERATED_USTRUCT_BODY()
 
 	// The materials to render for each brick material.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Materials)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Materials)
 	TArray<FBrickMaterial> Materials;
 
 	// The material index that means "empty".
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Materials)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Materials)
 	int32 EmptyMaterialIndex;
 
 	// The number of bricks along each axis of a region is 2^BricksPerChunkLog2
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Chunks)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Chunks)
 	FInt3 BricksPerRegionLog2;
 
 	// The number of chunks along each axis of a region is 2^ChunksPerRegionLog2
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Regions)
 	FInt3 RenderChunksPerRegionLog2;
 
 	// The number of collision chunks along each axis of a region is 2^ChunksPerRegionLog2
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Regions)
 	FInt3 CollisionChunksPerRegionLog2;
 
 	// The minimum region coordinates allowed.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Regions)
 	FInt3 MinRegionCoordinates;
 
 	// The maximum region coordinates allowed.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Regions)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Regions)
 	FInt3 MaxRegionCoordinates;
 
 	// The radius in bricks of the blur applied to the ambient occlusion.
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category=Lighting)
+	UPROPERTY(EditAnywhere,BlueprintReadOnly,Category=Lighting)
 	int32 AmbientOcclusionBlurRadius;
 
 	FBrickGridParameters();

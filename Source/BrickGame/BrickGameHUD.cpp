@@ -3,7 +3,7 @@
 #include "BrickGame.h"
 #include "BrickGameHUD.h"
 
-ABrickGameHUD::ABrickGameHUD(const class FPostConstructInitializeProperties& PCIP) : Super(PCIP)
+ABrickGameHUD::ABrickGameHUD(const class FObjectInitializer& Initializer) : Super(Initializer)
 {
 	// Set the crosshair texture
 	static ConstructorHelpers::FObjectFinder<UTexture2D> CrosshiarTexObj(TEXT("/Game/Textures/Crosshair"));
