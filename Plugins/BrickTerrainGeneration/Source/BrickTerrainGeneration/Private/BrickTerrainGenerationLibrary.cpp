@@ -91,72 +91,80 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 
 	const FInt3 MinRegionBrickCoordinates = RegionCoordinates * BricksPerRegion;
 	const FInt3 MaxRegionBrickCoordinates = MinRegionBrickCoordinates + BricksPerRegion - FInt3::Scalar(1);
+	FGraphEventArray YSliceCompletionEvents;
 	for(int32 LocalY = 0;LocalY < BricksPerRegion.Y;++LocalY)
 	{
-		for(int32 LocalX = 0;LocalX < BricksPerRegion.X;++LocalX)
+		// Create a task for each slice of constant Y.
+		YSliceCompletionEvents.Add(FFunctionGraphTask::CreateAndDispatchWhenReady([&,LocalY]()
 		{
-			const int32 X = MinRegionBrickCoordinates.X + LocalX;
-			const int32 Y = MinRegionBrickCoordinates.Y + LocalY;
-			const float Erosion = LocalErosionFunction.Sample2D(BiasedSeed * 59 + X,Y);
-			const float UnerodedGroundHeight = LocalUnerodedHeightFunction.Sample2D(BiasedSeed * 67 + X,Y) * NoiseToLocalScale;
-			const float ErodedGroundHeight = LocalErodedHeightFunction.Sample2D(BiasedSeed * 71 + X,Y) * NoiseToLocalScale;
-			const float RockHeight = FMath::Lerp(UnerodedGroundHeight,ErodedGroundHeight,Erosion);
-			const float BaseDirtThickness = LocalDirtThicknessFunction.Sample2D(BiasedSeed * 79 + X,Y) * NoiseToLocalScale;
-			const float DirtThicknessFactor = Parameters.DirtThicknessFactorByHeight->FloatCurve.Eval(RockHeight * LocalToWorldScale);
-			const float DirtThickness = FMath::Max(0.0f,BaseDirtThickness * DirtThicknessFactor);
-			const float GroundHeight = RockHeight + DirtThickness;
-
-			const int32 BrickRockHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FPlatformMath::CeilToInt(RockHeight));
-			const int32 BrickGroundHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FPlatformMath::CeilToInt(GroundHeight));
-
-			float CavernProbabilitySamples[BrickGridConstants::MaxBricksPerRegionAxis];
-			const uint32 NumCavernProbabilitySamples = FMath::Min(BrickGridConstants::MaxBricksPerRegionAxis >> 2,(BrickGroundHeight + 3) >> 2);
-			float PreviousCavernProbabilitySample = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z - 1);
-			for(uint32 CavernSampleIndex = 0;CavernSampleIndex < NumCavernProbabilitySamples;++CavernSampleIndex)
+			for(int32 LocalX = 0;LocalX < BricksPerRegion.X;++LocalX)
 			{
-				const uint32 LocalZ = CavernSampleIndex << 2;
-				const float NextCavernProbabilitySample = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z + LocalZ + 3);
-				CavernProbabilitySamples[LocalZ + 0] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,1.0f / 4.0f);
-				CavernProbabilitySamples[LocalZ + 1] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,2.0f / 4.0f);
-				CavernProbabilitySamples[LocalZ + 2] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,3.0f / 4.0f);
-				CavernProbabilitySamples[LocalZ + 3] = NextCavernProbabilitySample;
-				PreviousCavernProbabilitySample = NextCavernProbabilitySample;
-			}
+				const int32 X = MinRegionBrickCoordinates.X + LocalX;
+				const int32 Y = MinRegionBrickCoordinates.Y + LocalY;
+				const float Erosion = LocalErosionFunction.Sample2D(BiasedSeed * 59 + X,Y);
+				const float UnerodedGroundHeight = LocalUnerodedHeightFunction.Sample2D(BiasedSeed * 67 + X,Y) * NoiseToLocalScale;
+				const float ErodedGroundHeight = LocalErodedHeightFunction.Sample2D(BiasedSeed * 71 + X,Y) * NoiseToLocalScale;
+				const float RockHeight = FMath::Lerp(UnerodedGroundHeight,ErodedGroundHeight,Erosion);
+				const float BaseDirtThickness = LocalDirtThicknessFunction.Sample2D(BiasedSeed * 79 + X,Y) * NoiseToLocalScale;
+				const float DirtThicknessFactor = Parameters.DirtThicknessFactorByHeight->FloatCurve.Eval(RockHeight * LocalToWorldScale);
+				const float DirtThickness = FMath::Max(0.0f,BaseDirtThickness * DirtThicknessFactor);
+				const float GroundHeight = RockHeight + DirtThickness;
 
-			for(int32 LocalZ = 0;LocalZ < BricksPerRegion.Z;++LocalZ)
-			{
-				const int32 Z = MinRegionBrickCoordinates.Z + LocalZ;
-				const FInt3 BrickCoordinates(X,Y,Z);
-				int32 MaterialIndex = 0;
-				if(Z == Grid->MinBrickCoordinates.Z)
+				const int32 BrickRockHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FPlatformMath::CeilToInt(RockHeight));
+				const int32 BrickGroundHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FPlatformMath::CeilToInt(GroundHeight));
+
+				float CavernProbabilitySamples[BrickGridConstants::MaxBricksPerRegionAxis];
+				const uint32 NumCavernProbabilitySamples = FMath::Min(BrickGridConstants::MaxBricksPerRegionAxis >> 2,(BrickGroundHeight + 3) >> 2);
+				float PreviousCavernProbabilitySample = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z - 1);
+				for(uint32 CavernSampleIndex = 0;CavernSampleIndex < NumCavernProbabilitySamples;++CavernSampleIndex)
 				{
-					MaterialIndex = Parameters.BottomMaterialIndex;
+					const uint32 LocalZ = CavernSampleIndex << 2;
+					const float NextCavernProbabilitySample = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z + LocalZ + 3);
+					CavernProbabilitySamples[LocalZ + 0] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,1.0f / 4.0f);
+					CavernProbabilitySamples[LocalZ + 1] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,2.0f / 4.0f);
+					CavernProbabilitySamples[LocalZ + 2] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,3.0f / 4.0f);
+					CavernProbabilitySamples[LocalZ + 3] = NextCavernProbabilitySample;
+					PreviousCavernProbabilitySample = NextCavernProbabilitySample;
 				}
-				else if(Z <= BrickGroundHeight)
+
+				for(int32 LocalZ = 0;LocalZ < BricksPerRegion.Z;++LocalZ)
 				{
-					const float CavernProbability = CavernProbabilitySamples[LocalZ];
-					const float RockCavernThreshold = Parameters.CavernThresholdByHeight->FloatCurve.Eval(Z * LocalToWorldScale);
-					if(Z <= BrickRockHeight)
+					const int32 Z = MinRegionBrickCoordinates.Z + LocalZ;
+					const FInt3 BrickCoordinates(X,Y,Z);
+					int32 MaterialIndex = 0;
+					if(Z == Grid->MinBrickCoordinates.Z)
 					{
-						if(CavernProbability > RockCavernThreshold)
+						MaterialIndex = Parameters.BottomMaterialIndex;
+					}
+					else if(Z <= BrickGroundHeight)
+					{
+						const float CavernProbability = CavernProbabilitySamples[LocalZ];
+						const float RockCavernThreshold = Parameters.CavernThresholdByHeight->FloatCurve.Eval(Z * LocalToWorldScale);
+						if(Z <= BrickRockHeight)
 						{
-							MaterialIndex = Parameters.RockMaterialIndex;
+							if(CavernProbability > RockCavernThreshold)
+							{
+								MaterialIndex = Parameters.RockMaterialIndex;
+							}
+						}
+						else
+						{
+							if(CavernProbability > RockCavernThreshold + Parameters.DirtCavernThresholdBias)
+							{
+								MaterialIndex = Z == BrickGroundHeight && LocalMoistureFunction.Sample2D(BiasedSeed * 61 + X,Y) > Parameters.GrassMoistureThreshold
+									? Parameters.GrassMaterialIndex
+									: Parameters.DirtMaterialIndex;
+							}
 						}
 					}
-					else
-					{
-						if(CavernProbability > RockCavernThreshold + Parameters.DirtCavernThresholdBias)
-						{
-							MaterialIndex = Z == BrickGroundHeight && LocalMoistureFunction.Sample2D(BiasedSeed * 61 + X,Y) > Parameters.GrassMoistureThreshold
-								? Parameters.GrassMaterialIndex
-								: Parameters.DirtMaterialIndex;
-						}
-					}
+					LocalBrickMaterials[((LocalY * BricksPerRegion.X) + LocalX) * BricksPerRegion.Z + LocalZ] = MaterialIndex;
 				}
-				LocalBrickMaterials[((LocalY * BricksPerRegion.X) + LocalX) * BricksPerRegion.Z + LocalZ] = MaterialIndex;
 			}
-		}
+		}, TStatId(), NULL));
 	}
+
+	// Wait for all the YSlice tasks to complete.
+	FTaskGraphInterface::Get().WaitUntilTasksComplete(YSliceCompletionEvents,ENamedThreads::GameThread);
 
 	Grid->SetBrickMaterialArray(MinRegionBrickCoordinates,MaxRegionBrickCoordinates,LocalBrickMaterials);
 
