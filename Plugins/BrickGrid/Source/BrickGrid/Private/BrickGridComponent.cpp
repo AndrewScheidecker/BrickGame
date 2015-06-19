@@ -198,7 +198,7 @@ void UBrickGridComponent::UpdateMaxNonEmptyBrickMap(FBrickRegion& Region,const F
 	// Allocate the map.
 	if(!Region.MaxNonEmptyBrickRegionZs.Num())
 	{
-		Region.MaxNonEmptyBrickRegionZs.Init(1 << (Parameters.BricksPerRegionLog2.X + Parameters.BricksPerRegionLog2.Y));
+		Region.MaxNonEmptyBrickRegionZs.SetNumUninitialized(1 << (Parameters.BricksPerRegionLog2.X + Parameters.BricksPerRegionLog2.Y));
 	}
 
 	// For each XY in the chunk, find the highest non-empty brick between the bottom of the chunk and the top of the grid.
@@ -429,7 +429,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 					if(!RenderComponent)
 					{
 						// Initialize a new chunk component.
-						RenderComponent = ConstructObject<UBrickRenderComponent>(UBrickRenderComponent::StaticClass(), GetOwner());
+						RenderComponent = NewObject<UBrickRenderComponent>(GetOwner());
 						RenderComponent->Grid = this;
 						RenderComponent->Coordinates = ChunkCoordinates;
 
@@ -482,7 +482,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 					if(!CollisionChunkCoordinatesToComponent.FindRef(ChunkCoordinates))
 					{
 						// Initialize a new chunk component.
-						UBrickCollisionComponent* Chunk = ConstructObject<UBrickCollisionComponent>(UBrickCollisionComponent::StaticClass(), GetOwner());
+						UBrickCollisionComponent* Chunk = NewObject<UBrickCollisionComponent>(GetOwner());
 						Chunk->Grid = this;
 						Chunk->Coordinates = ChunkCoordinates;
 

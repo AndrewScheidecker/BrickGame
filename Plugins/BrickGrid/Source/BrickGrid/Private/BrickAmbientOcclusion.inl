@@ -18,19 +18,19 @@ static void ComputeChunkAO(
 
 	// For each XY in the chunk, find the highest non-empty brick between the bottom of the chunk and the top of the grid.
 	TArray<int8> MaxNonEmptyBrickLocalZs;
-	MaxNonEmptyBrickLocalZs.Init(LocalBricksDim.X * LocalBricksDim.Y);
+	MaxNonEmptyBrickLocalZs.SetNumUninitialized(LocalBricksDim.X * LocalBricksDim.Y);
 	Grid->GetMaxNonEmptyBrickZ(MinLocalBrickCoordinates,MinLocalBrickCoordinates + LocalBricksDim - FInt3::Scalar(1),MaxNonEmptyBrickLocalZs);
 
 	// Allocate filtered ambient occlusion factors for each brick adjacent to the output vertices.
 	TArray<uint8> LocalBrickAmbientFactors;
 	const FInt3 LocalBrickAmbientFactorsDim = LocalBricksDim - FInt3(BlurDiameter,BlurDiameter,0);
 	check(LocalBrickAmbientFactorsDim == LocalVertexDim + FInt3::Scalar(1));
-	LocalBrickAmbientFactors.Init(LocalBrickAmbientFactorsDim.X * LocalBrickAmbientFactorsDim.Y * LocalBrickAmbientFactorsDim.Z);
+	LocalBrickAmbientFactors.SetNumUninitialized(LocalBrickAmbientFactorsDim.X * LocalBrickAmbientFactorsDim.Y * LocalBrickAmbientFactorsDim.Z);
 
 	// Allocate a buffer for the result of applying the X half of a separable blur to a single Z slice of bricks.
 	const int32 BricksInHalfFilteredBufferX = LocalBricksDim.X - BlurDiameter;
 	TArray<uint8> HalfFilteredVisibility;
-	HalfFilteredVisibility.Init(BricksInHalfFilteredBufferX * LocalBricksDim.Y);
+	HalfFilteredVisibility.SetNumUninitialized(BricksInHalfFilteredBufferX * LocalBricksDim.Y);
 
 	for(int32 AmbientBrickZ = 0;AmbientBrickZ < LocalBrickAmbientFactorsDim.Z;++AmbientBrickZ)
 	{

@@ -365,7 +365,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 	// Read the brick materials for all the bricks that affect this chunk.
 	const FInt3 LocalBricksDim = Grid->BricksPerRenderChunk + LocalBrickExpansion * FInt3::Scalar(2);
 	TArray<uint8> LocalBrickMaterials;
-	LocalBrickMaterials.Init(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
+	LocalBrickMaterials.SetNumUninitialized(LocalBricksDim.X * LocalBricksDim.Y * LocalBricksDim.Z);
 	Grid->GetBrickMaterialArray(MinLocalBrickCoordinates,MinLocalBrickCoordinates + LocalBricksDim - FInt3::Scalar(1),LocalBrickMaterials);
 
 	// Check whether there are any non-empty bricks in this chunk.
@@ -395,7 +395,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 		// Compute the ambient occlusion for the vertices in this chunk.
 		const FInt3 LocalVertexDim = Grid->BricksPerRenderChunk + FInt3::Scalar(1);
 		TArray<uint8> LocalVertexAmbientFactors;
-		LocalVertexAmbientFactors.Init(LocalVertexDim.X * LocalVertexDim.Y * LocalVertexDim.Z);
+		LocalVertexAmbientFactors.SetNumUninitialized(LocalVertexDim.X * LocalVertexDim.Y * LocalVertexDim.Z);
 		ComputeChunkAO(Grid,MinLocalBrickCoordinates,LocalBrickExpansion,LocalBricksDim,LocalVertexDim,LocalBrickMaterials,LocalVertexAmbientFactors);
 
 		// Create an array of the vertices needed to render this chunk, along with a map from 3D coordinates to indices.
