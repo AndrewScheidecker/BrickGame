@@ -114,8 +114,11 @@ class FBrickChunkVertexFactory : public FLocalVertexFactory
 {
 public:
 
-	void Init(const FBrickChunkVertexBuffer& VertexBuffer,uint32 FaceIndex)
+	void Init(const FBrickChunkVertexBuffer& VertexBuffer,const FPrimitiveSceneProxy* InPrimitiveSceneProxy,uint8 InFaceIndex)
 	{
+		PrimitiveSceneProxy = InPrimitiveSceneProxy;
+		FaceIndex = InFaceIndex;
+
 		// Initialize the vertex factory's stream components.
 		DataType NewData;
 		NewData.PositionComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N);
@@ -132,6 +135,40 @@ public:
 		{
 			VertexFactory->SetData(NewData);
 		});
+	}
+
+	#if UE4_HAS_IMPROVED_MESHBATCH_ELEMENT_VISIBILITY
+		virtual uint64 GetStaticBatchElementVisibility(const class FSceneView& View, const struct FMeshBatch* Batch) const override
+		{
+			return IsStaticBatchVisible(View.ViewMatrices.ViewOrigin,Batch) ? 1 : 0;
+		}
+		virtual uint64 GetStaticBatchElementShadowVisibility(const class FSceneView& View, const FLightSceneProxy* LightSceneProxy, const struct FMeshBatch* Batch) const override
+		{
+			return IsStaticBatchVisible(LightSceneProxy->GetPosition(),Batch) ? 1 : 0;
+		}
+	#endif
+
+private:
+
+	const FPrimitiveSceneProxy* PrimitiveSceneProxy;
+	uint8 FaceIndex;
+
+	bool IsStaticBatchVisible(const FVector4& ViewPosition,const struct FMeshBatch* Batch) const
+	{
+		const uint8 FaceIndex = Batch->Elements[0].UserIndex;
+		const FBox BoundingBox = PrimitiveSceneProxy->GetBounds().GetBox();
+		const FVector MinRelativePosition = ViewPosition - BoundingBox.Min * ViewPosition.W;
+		const FVector MaxRelativePosition = ViewPosition - BoundingBox.Max * ViewPosition.W;
+		switch(FaceIndex)
+		{
+		case 0:	return MaxRelativePosition.X < 0.0f;
+		case 1:	return MinRelativePosition.X > 0.0f;
+		case 2:	return MaxRelativePosition.Y < 0.0f;
+		case 3:	return MinRelativePosition.Y > 0.0f;
+		case 4:	return MaxRelativePosition.Z < 0.0f;
+		case 5:	return MinRelativePosition.Z > 0.0f;
+		default: return false;
+		}
 	}
 };
 
@@ -169,7 +206,7 @@ public:
 		BeginInitResource(&IndexBuffer);
 		for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 		{
-			VertexFactories[FaceIndex].Init(VertexBuffer,FaceIndex);
+			VertexFactories[FaceIndex].Init(VertexBuffer,this,FaceIndex);
 			BeginInitResource(&VertexFactories[FaceIndex]);
 		}
 	}
@@ -215,78 +252,13 @@ public:
 		}
 	}
 
-	#if UE4_HAS_LOD_CULLING_CHANGES
-		FVisibleLODArray GetLODsForPosition(const FVector4& Position) const
-		{
-			FVisibleLODArray VisibleFaceIndices;
-
-			const FBox BoundingBox = GetBounds().GetBox();
-			const FVector MinRelativePosition = Position - BoundingBox.Min * Position.W;
-			const FVector MaxRelativePosition = Position - BoundingBox.Max * Position.W;
-
-			if(MinRelativePosition.X > 0.0f)
-			{
-				// If the position is inside the -X bounds, draw the +X faces.
-				const int8 FaceIndexPosX = 1;
-				VisibleFaceIndices.Add(FaceIndexPosX);
-			}
-			if(MaxRelativePosition.X < 0.0f)
-			{
-				// If the position is inside the +X bounds, draw the -X faces.
-				const int8 FaceIndexNegX = 0;
-				VisibleFaceIndices.Add(FaceIndexNegX);
-			}
-
-			if(MinRelativePosition.Y > 0.0f)
-			{
-				// If the position is inside the -Y bounds, draw the +Y faces.
-				const int8 FaceIndexPosY = 3;
-				VisibleFaceIndices.Add(FaceIndexPosY);
-			}
-			if(MaxRelativePosition.Y < 0.0f)
-			{
-				// If the position is inside the +Y bounds, draw the -Y faces.
-				const int8 FaceIndexNegY = 2;
-				VisibleFaceIndices.Add(FaceIndexNegY);
-			}
-
-			if(MinRelativePosition.Z > 0.0f)
-			{
-				// If the position is inside the -Z bounds, draw the +Z faces.
-				const int8 FaceIndexPosZ = 5;
-				VisibleFaceIndices.Add(FaceIndexPosZ);
-			}
-			if(MaxRelativePosition.Z < 0.0f)
-			{
-				// If the position is inside the +Z bounds, draw the -Z faces.
-				const int8 FaceIndexNegZ = 4;
-				VisibleFaceIndices.Add(FaceIndexNegZ);
-			}
-
-			return VisibleFaceIndices;
-		}
-
-		virtual FVisibleLODArray GetStaticElementLODs(const FSceneView* View) const override
-		{
-			return GetLODsForPosition(View->ViewMatrices.ViewOrigin);
-		}
-		virtual FVisibleLODArray GetShadowStaticElementLODs(const FLightSceneProxy* LightSceneProxy,const FSceneViewFamily& ViewFamily,bool bReflectiveShadowMap) const override
-		{
-			return GetLODsForPosition(LightSceneProxy->GetPosition());
-		}
-	#endif
-
 	virtual void DrawStaticElements(FStaticPrimitiveDrawInterface* PDI) override
 	{
 		for(int32 ElementIndex = 0; ElementIndex < Elements.Num(); ++ElementIndex)
 		{
 			FMeshBatch Batch;
 			InitMeshBatch(Batch,ElementIndex,NULL);
-			#if UE4_HAS_LOD_CULLING_CHANGES
-				PDI->DrawMesh(Batch,Elements[ElementIndex].FaceIndex);
-			#else
-				PDI->DrawMesh(Batch,FLT_MAX);
-			#endif
+			PDI->DrawMesh(Batch,FLT_MAX);
 		}
 	}
 
@@ -319,12 +291,16 @@ public:
 		OutBatch.Type = PT_TriangleList;
 		OutBatch.DepthPriorityGroup = SDPG_World;
 		OutBatch.CastShadow = true;
+		#if UE4_HAS_IMPROVED_MESHBATCH_ELEMENT_VISIBILITY
+			OutBatch.bRequiresPerElementVisibility = true;
+		#endif
 		OutBatch.Elements[0].FirstIndex = Element.FirstIndex;
 		OutBatch.Elements[0].NumPrimitives = Element.NumPrimitives;
 		OutBatch.Elements[0].MinVertexIndex = 0;
 		OutBatch.Elements[0].MaxVertexIndex = VertexBuffer.Vertices.Num() - 1;
 		OutBatch.Elements[0].IndexBuffer = &IndexBuffer;
 		OutBatch.Elements[0].PrimitiveUniformBuffer = PrimitiveUniformBuffer;
+		OutBatch.Elements[0].UserIndex = Element.FaceIndex;
 	}
 };
 
