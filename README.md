@@ -10,7 +10,7 @@ Most of the functionality is implemented in plugins, so you can use those plugin
 
 # Engine modification
 
-BrickGame is built with a slightly modified branch of Unreal Engine 4.5. The code for the branch is [here](https://github.com/AndrewScheidecker/UnrealEngine/tree/BrickGame-4.5). To use this branch to link against BrickGame, clone it locally, and follow the [instructions](https://github.com/AndrewScheidecker/UnrealEngine/blob/BrickGame-4.5/README.md) to register the branch for use by the "Generate Visual Studio Projects" command.
+BrickGame is built with a slightly modified branch of Unreal Engine 4.8. The code for the branch is [here](https://github.com/AndrewScheidecker/UnrealEngine/tree/BrickGame-4.8). To use this branch to link against BrickGame, clone it locally, and follow the [instructions](https://github.com/AndrewScheidecker/UnrealEngine/blob/BrickGame-4.5/README.md) to register the branch for use by the "Generate Visual Studio Projects" command.
 
 The changes are:
 * Light propagation volume is hacked to ignore the ambient occlusion values computed for the bricks, which will only apply to the ambient cubemap.
