@@ -100,8 +100,8 @@ public:
 			const FVector UnprojectedTangentY(-1,-1,-1);
 			const FVector FaceNormal = FaceNormals[FaceIndex].ToFloat();
 			const FVector ProjectedFaceTangentX = (UnprojectedTangentX - FaceNormal * (UnprojectedTangentX | FaceNormal)).GetSafeNormal();
-			*TangentBufferData++ = FPackedNormal(ProjectedFaceTangentX);
-			*TangentBufferData++ = FPackedNormal(FVector4(FaceNormal, FMath::Sign(UnprojectedTangentY | (FaceNormal ^ ProjectedFaceTangentX))));
+			*TangentBufferData++ = ProjectedFaceTangentX;
+			*TangentBufferData++ = FVector4(FaceNormal, FMath::Sign(UnprojectedTangentY | (FaceNormal ^ ProjectedFaceTangentX)));
 		}
 		RHIUnlockVertexBuffer(VertexBufferRHI);
 	}
