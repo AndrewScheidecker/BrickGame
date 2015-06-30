@@ -91,13 +91,13 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 
 	const FInt3 MinRegionBrickCoordinates = RegionCoordinates * BricksPerRegion;
 	const FInt3 MaxRegionBrickCoordinates = MinRegionBrickCoordinates + BricksPerRegion - FInt3::Scalar(1);
-	FGraphEventArray YSliceCompletionEvents;
+	FGraphEventArray XYStackCompletionEvents;
 	for(int32 LocalY = 0;LocalY < BricksPerRegion.Y;++LocalY)
 	{
-		// Create a task for each slice of constant Y.
-		YSliceCompletionEvents.Add(FFunctionGraphTask::CreateAndDispatchWhenReady([&,LocalY]()
+		for(int32 LocalX = 0;LocalX < BricksPerRegion.X;++LocalX)
 		{
-			for(int32 LocalX = 0;LocalX < BricksPerRegion.X;++LocalX)
+			// Create a task for each stack of constant XY.
+			XYStackCompletionEvents.Add(FFunctionGraphTask::CreateAndDispatchWhenReady([&,LocalX,LocalY]()
 			{
 				const int32 X = MinRegionBrickCoordinates.X + LocalX;
 				const int32 Y = MinRegionBrickCoordinates.Y + LocalY;
@@ -159,12 +159,12 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 					}
 					LocalBrickMaterials[((LocalY * BricksPerRegion.X) + LocalX) * BricksPerRegion.Z + LocalZ] = MaterialIndex;
 				}
-			}
-		}, TStatId(), NULL));
+			}, TStatId(), NULL));
+		}
 	}
 
 	// Wait for all the YSlice tasks to complete.
-	FTaskGraphInterface::Get().WaitUntilTasksComplete(YSliceCompletionEvents,ENamedThreads::GameThread);
+	FTaskGraphInterface::Get().WaitUntilTasksComplete(XYStackCompletionEvents,ENamedThreads::GameThread);
 
 	Grid->SetBrickMaterialArray(MinRegionBrickCoordinates,MaxRegionBrickCoordinates,LocalBrickMaterials);
 
