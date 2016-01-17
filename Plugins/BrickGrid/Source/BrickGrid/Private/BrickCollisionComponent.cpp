@@ -3,6 +3,7 @@
 #include "BrickGridPluginPrivatePCH.h"
 #include "BrickCollisionComponent.h"
 #include "BrickGridComponent.h"
+#include "PhysicsEngine/BodySetup.h"
 
 // Maps face index to normal.
 static const FInt3 FaceNormals[6] =
