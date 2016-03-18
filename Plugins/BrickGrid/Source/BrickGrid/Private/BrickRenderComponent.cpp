@@ -414,10 +414,8 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							const uint32 LocalBrickIndex = (LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z;
 
 
-							if ((IsWaterVertex && LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
-								||
-								(!IsWaterVertex && (LocalBrickMaterials[LocalBrickIndex] == 9 || LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex))
-								)//being 9 the water material index
+							if (!IsWaterVertex && (LocalBrickMaterials[LocalBrickIndex] == 9 || LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex))
+								//being 9 the water material index
 							{
 								HasEmptyAdjacentBrick = true;
 							}
