@@ -389,6 +389,8 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 			// Create an array of the vertices needed to render this chunk, along with a map from 3D coordinates to indices.
 			TArray<uint16> VertexIndexMap;
 			VertexIndexMap.Empty(LocalVertexDim.X * LocalVertexDim.Y * LocalVertexDim.Z);
+			TArray<uint16> WaterVertexIndexMap;
+			WaterVertexIndexMap.Empty(LocalVertexDim.X * LocalVertexDim.Y * LocalVertexDim.Z);
 
 			for (int32 LocalVertexY = 0; LocalVertexY < LocalVertexDim.Y; ++LocalVertexY)
 			{
@@ -404,17 +406,17 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 						const FInt3 OwnLocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(0) + LocalBrickExpansion - FInt3::Scalar(1);
 						const uint32 OwnLocalBrickIndex = (OwnLocalBrickCoordinates.Y * LocalBricksDim.X + OwnLocalBrickCoordinates.X) * LocalBricksDim.Z + OwnLocalBrickCoordinates.Z;
+						if (LocalBrickMaterials[OwnLocalBrickIndex] == 9) IsWaterVertex = true;
 
 						for (uint32 AdjacentBrickIndex = 0; AdjacentBrickIndex < 8; ++AdjacentBrickIndex)
 						{
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
 							const uint32 LocalBrickIndex = (LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z;
-							if (LocalBrickMaterials[OwnLocalBrickIndex] == 9) IsWaterVertex = true;
+							
 
-							if ((LocalBrickMaterials[OwnLocalBrickIndex] == 9 && LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
+							if ((IsWaterVertex && LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
 								||
-								(LocalBrickMaterials[OwnLocalBrickIndex] != 9
-									&& (LocalBrickMaterials[LocalBrickIndex] == 9 || LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex))
+								(!IsWaterVertex && (LocalBrickMaterials[LocalBrickIndex] == 9 || LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex))
 								)//being 9 the water material index
 							{
 								HasEmptyAdjacentBrick = true;
@@ -424,9 +426,19 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 								HasNonEmptyAdjacentBrick = true;
 							}
 						}
+						if (IsWaterVertex)
+						{
+							if (HasEmptyAdjacentBrick && HasNonEmptyAdjacentBrick)
+							{
+								VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
+								new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
+									LocalVertexCoordinates,
+									LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
+									);
+							}
+						}
 						if (!IsWaterVertex)
 						{
-
 							if (HasEmptyAdjacentBrick && HasNonEmptyAdjacentBrick)
 							{
 								VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
@@ -438,26 +450,6 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							else
 							{
 								VertexIndexMap.Add(0);
-							}
-						}
-						else
-						{
-							if (HasEmptyAdjacentBrick && HasNonEmptyAdjacentBrick)
-							{
-								
-								VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
-								new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
-									LocalVertexCoordinates,
-									LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
-									);
-							}
-							else
-							{
-								VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
-								new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
-									LocalVertexCoordinates,
-									LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
-									);
 							}
 						}
 					}
@@ -479,7 +471,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							const FInt3 RelativeBrickCoordinates = FInt3(LocalBrickX, LocalBrickY, LocalBrickZ) - LocalBrickExpansion;
 							for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
 							{
-								if ((BrickMaterial == 9 && FaceIndex == 5) || BrickMaterial != 9)
+								if ((BrickMaterial == 9) || BrickMaterial != 9)
 								{// Only draw faces that face empty bricks.
 									const int32 FacingLocalBrickX = LocalBrickX + FaceNormals[FaceIndex].X;
 									const int32 FacingLocalBrickY = LocalBrickY + FaceNormals[FaceIndex].Y;
