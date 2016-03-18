@@ -412,7 +412,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 						{
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
 							const uint32 LocalBrickIndex = (LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z;
-							
+
 
 							if ((IsWaterVertex && LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
 								||
@@ -428,14 +428,12 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 						}
 						if (IsWaterVertex)
 						{
-							if (HasEmptyAdjacentBrick && HasNonEmptyAdjacentBrick)
-							{
-								VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
-								new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
-									LocalVertexCoordinates,
-									LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
-									);
-							}
+							VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
+							new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
+								LocalVertexCoordinates,
+								LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
+								);
+
 						}
 						if (!IsWaterVertex)
 						{
@@ -471,36 +469,35 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							const FInt3 RelativeBrickCoordinates = FInt3(LocalBrickX, LocalBrickY, LocalBrickZ) - LocalBrickExpansion;
 							for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
 							{
-								if ((BrickMaterial == 9) || BrickMaterial != 9)
-								{// Only draw faces that face empty bricks.
-									const int32 FacingLocalBrickX = LocalBrickX + FaceNormals[FaceIndex].X;
-									const int32 FacingLocalBrickY = LocalBrickY + FaceNormals[FaceIndex].Y;
-									const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
-									const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
-									const uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
-									if (FrontBrickMaterial == EmptyMaterialIndex || ((BrickMaterial != 9) && FrontBrickMaterial == 9))// being 9 the water material index
+								// Only draw faces that face empty bricks.
+								const int32 FacingLocalBrickX = LocalBrickX + FaceNormals[FaceIndex].X;
+								const int32 FacingLocalBrickY = LocalBrickY + FaceNormals[FaceIndex].Y;
+								const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
+								const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
+								const uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
+								if (FrontBrickMaterial == EmptyMaterialIndex || ((BrickMaterial != 9) && FrontBrickMaterial == 9))// being 9 the water material index
+								{
+									uint16 FaceVertexIndices[4];
+									for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)
 									{
-										uint16 FaceVertexIndices[4];
-										for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)
-										{
-											const FInt3 CornerVertexOffset = GetCornerVertexOffset(FaceVertices[FaceIndex][FaceVertexIndex]);
-											const FInt3 LocalVertexCoordinates = RelativeBrickCoordinates + CornerVertexOffset;
-											FaceVertexIndices[FaceVertexIndex] = VertexIndexMap[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z];
+										const FInt3 CornerVertexOffset = GetCornerVertexOffset(FaceVertices[FaceIndex][FaceVertexIndex]);
+										const FInt3 LocalVertexCoordinates = RelativeBrickCoordinates + CornerVertexOffset;
+										FaceVertexIndices[FaceVertexIndex] = VertexIndexMap[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z];
 
-										}
-
-										// Write the indices for the brick face.
-										FFaceBatch& FaceBatch = MaterialBatches[BrickMaterial].FaceBatches[FaceIndex];
-										uint16* FaceVertexIndex = &FaceBatch.Indices[FaceBatch.Indices.AddUninitialized(6)];
-										*FaceVertexIndex++ = FaceVertexIndices[0];
-										*FaceVertexIndex++ = FaceVertexIndices[1];
-										*FaceVertexIndex++ = FaceVertexIndices[2];
-										*FaceVertexIndex++ = FaceVertexIndices[0];
-										*FaceVertexIndex++ = FaceVertexIndices[2];
-										*FaceVertexIndex++ = FaceVertexIndices[3];
 									}
+
+									// Write the indices for the brick face.
+									FFaceBatch& FaceBatch = MaterialBatches[BrickMaterial].FaceBatches[FaceIndex];
+									uint16* FaceVertexIndex = &FaceBatch.Indices[FaceBatch.Indices.AddUninitialized(6)];
+									*FaceVertexIndex++ = FaceVertexIndices[0];
+									*FaceVertexIndex++ = FaceVertexIndices[1];
+									*FaceVertexIndex++ = FaceVertexIndices[2];
+									*FaceVertexIndex++ = FaceVertexIndices[0];
+									*FaceVertexIndex++ = FaceVertexIndices[2];
+									*FaceVertexIndex++ = FaceVertexIndices[3];
 								}
 							}
+
 						}
 					}
 				}
