@@ -399,10 +399,15 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 						bool HasEmptyAdjacentBrick = false;
 						bool HasNonEmptyAdjacentBrick = false;
+						bool IsTranslucentBrick = false;
 						for(uint32 AdjacentBrickIndex = 0;AdjacentBrickIndex < 8;++AdjacentBrickIndex)
 						{
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
 							const uint32 LocalBrickIndex = (LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z;
+							
+							if (LocalBrickMaterials[LocalBrickIndex] == 9)
+								IsTranslucentBrick = true;//being 9 the water material index
+
 							if(LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
 							{
 								HasEmptyAdjacentBrick = true;
@@ -413,17 +418,30 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							}
 						}
 
-						if(HasEmptyAdjacentBrick && HasNonEmptyAdjacentBrick)
+						if (IsTranslucentBrick)
 						{
 							VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
 							new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
 								LocalVertexCoordinates,
 								LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
 								);
+
+
 						}
-						else
+						if (!IsTranslucentBrick)
 						{
-							VertexIndexMap.Add(0);
+							if (HasEmptyAdjacentBrick && HasNonEmptyAdjacentBrick)
+							{
+								VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
+								new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
+									LocalVertexCoordinates,
+									LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
+									);
+							}
+							else
+							{
+								VertexIndexMap.Add(0);
+							}
 						}
 					}
 				}
@@ -450,7 +468,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 								const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
 								const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
 								const uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
-								if(FrontBrickMaterial == EmptyMaterialIndex)
+								if (FrontBrickMaterial == EmptyMaterialIndex || ((BrickMaterial != 9) && FrontBrickMaterial == 9))// being 9 the water material index
 								{
 									uint16 FaceVertexIndices[4];
 									for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)
