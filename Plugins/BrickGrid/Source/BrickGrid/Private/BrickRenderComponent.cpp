@@ -405,8 +405,8 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
 							const uint32 LocalBrickIndex = (LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z;
 							
-							if (LocalBrickMaterials[LocalBrickIndex] == 9)
-								IsTranslucentBrick = true;//being 9 the water material index
+							if (Grid->Parameters.TranslucentMaterialsIndexes.Contains(LocalBrickMaterials[LocalBrickIndex]))
+								IsTranslucentBrick = true;
 
 							if(LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
 							{
@@ -468,7 +468,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 								const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
 								const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
 								const uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
-								if (FrontBrickMaterial == EmptyMaterialIndex || ((BrickMaterial != 9) && FrontBrickMaterial == 9))// being 9 the water material index
+								if (FrontBrickMaterial == EmptyMaterialIndex || (!Grid->Parameters.TranslucentMaterialsIndexes.Contains(BrickMaterial) && Grid->Parameters.TranslucentMaterialsIndexes.Contains(FrontBrickMaterial)))
 								{
 									uint16 FaceVertexIndices[4];
 									for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)

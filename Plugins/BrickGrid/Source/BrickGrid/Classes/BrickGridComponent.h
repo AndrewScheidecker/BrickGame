@@ -173,6 +173,10 @@ struct FBrickGridParameters
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Materials)
 	TArray<FBrickMaterial> Materials;
 
+	// The materials to render for each brick material.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Materials)
+		TArray<uint8> TranslucentMaterialsIndexes;
+
 	// The material index that means "empty".
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Materials)
 	int32 EmptyMaterialIndex;
