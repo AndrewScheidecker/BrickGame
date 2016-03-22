@@ -508,7 +508,7 @@ bool UBrickGridComponent::SaveCompressed(FString path)
 	toBeSaved.Regions = Regions;
 	bufArchive << toBeSaved;
 
-	UE_LOG(LogStats, Log, TEXT("Precompiled File Size: %s"), *FString::FromInt(bufArchive.Num()));
+	UE_LOG(LogStats, Log, TEXT("Precompressed File Size: %s"), *FString::FromInt(bufArchive.Num()));
 
 	TArray<uint8> compressedData;
 	FArchiveSaveCompressedProxy proxy = FArchiveSaveCompressedProxy(compressedData, COMPRESS_ZLIB);
