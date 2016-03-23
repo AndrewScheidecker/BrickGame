@@ -419,7 +419,6 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 						bool HasEmptyAdjacentBrick = false;
 						bool HasNonEmptyAdjacentBrick = false;
-						bool IsTranslucentBrick = false;
 						for(uint32 AdjacentBrickIndex = 0;AdjacentBrickIndex < 8;++AdjacentBrickIndex)
 						{
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
@@ -460,23 +459,6 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 						{
 							VertexIndexMap.Add(0);
 						}
-						/*
-						if (!IsTranslucentBrick)
-						{
-							if (HasEmptyAdjacentBrick && HasNonEmptyAdjacentBrick)
-							{
-								VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
-								new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
-									LocalVertexCoordinates,
-									LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
-									);
-							}
-							else
-							{
-								VertexIndexMap.Add(0);
-							}
-						}
-						*/
 					}
 				}
 			}
