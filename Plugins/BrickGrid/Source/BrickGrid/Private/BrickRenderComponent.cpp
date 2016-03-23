@@ -417,8 +417,6 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 						const FInt3 LocalVertexCoordinates(LocalVertexX,LocalVertexY,LocalVertexZ);
 						uint32 HasAdjacentBrickOfClass[(int32)EBrickClass::Count] = { 0 };
 
-						bool HasEmptyAdjacentBrick = false;
-						bool HasNonEmptyAdjacentBrick = false;
 						for(uint32 AdjacentBrickIndex = 0;AdjacentBrickIndex < 8;++AdjacentBrickIndex)
 						{
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
@@ -430,16 +428,6 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 								HasAdjacentBrickOfClass[(int32)EBrickClass::Translucent] = 1;
 							else if (BrickClassByMaterial[LocalBrickMaterials[LocalBrickIndex]] == EBrickClass::Opaque)
 								HasAdjacentBrickOfClass[(int32)EBrickClass::Opaque] = 1;
-							
-
-							if(LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
-							{
-								HasEmptyAdjacentBrick = true;
-							}
-							else
-							{
-								HasNonEmptyAdjacentBrick = true;
-							}
 						}
 
 						if ((HasAdjacentBrickOfClass[(int32)EBrickClass::Opaque]
