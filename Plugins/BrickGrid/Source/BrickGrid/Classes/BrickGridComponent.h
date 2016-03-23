@@ -38,9 +38,6 @@ struct FBrickMaterial
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category = Bricks)
 	class UMaterialInterface* OverrideTopSurfaceMaterial;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Bricks)
-	bool IsTranslucent = false;
-
 	FBrickMaterial() : SurfaceMaterial(NULL), OverrideTopSurfaceMaterial(NULL) {}
 };
 
