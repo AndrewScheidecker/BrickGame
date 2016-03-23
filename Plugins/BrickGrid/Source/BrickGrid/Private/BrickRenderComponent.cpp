@@ -31,6 +31,14 @@ static const FInt3 FaceNormals[6] =
 	FInt3(0, 0, +1)
 };
 
+enum class EBrickClass
+{
+	Empty = 0,
+	Translucent = 1,
+	Opaque = 2,
+	Count = 3
+};
+
 /**	An element of the vertex buffer given to the GPU by the CPU brick tessellator.
 	8-bit coordinates are used for efficiency. */
 struct FBrickVertex
@@ -328,7 +336,18 @@ UBrickRenderComponent::UBrickRenderComponent( const FObjectInitializer& Initiali
 FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 {
 	const double StartTime = FPlatformTime::Seconds();
-
+	TArray<EBrickClass> BrickClassByMaterial;
+	for (int32 iterator = 1; iterator < Grid->Parameters.Materials.Num(); ++iterator)
+	{
+		if (Grid->Parameters.Materials[iterator].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
+		{
+			BrickClassByMaterial.Add(EBrickClass::Translucent);
+		}
+		else if (Grid->Parameters.Materials[iterator].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Opaque)
+		{
+			BrickClassByMaterial.Add(EBrickClass::Opaque);
+		}
+	}
 	HasLowPriorityUpdatePending = false;
 
 	const FInt3 MinBrickCoordinates = Coordinates << Grid->BricksPerRenderChunkLog2;
@@ -396,6 +415,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 					for(int32 LocalVertexZ = 0; LocalVertexZ < LocalVertexDim.Z; ++LocalVertexZ)
 					{
 						const FInt3 LocalVertexCoordinates(LocalVertexX,LocalVertexY,LocalVertexZ);
+						uint32 HasAdjacentBrickOfClass[(int32)EBrickClass::Count] = { 0 };
 
 						bool HasEmptyAdjacentBrick = false;
 						bool HasNonEmptyAdjacentBrick = false;
@@ -405,8 +425,13 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
 							const uint32 LocalBrickIndex = (LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z;
 							
-							if (Grid->Parameters.TranslucentMaterialsIndexes.Contains(LocalBrickMaterials[LocalBrickIndex]))
-								IsTranslucentBrick = true;
+							if (LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
+								HasAdjacentBrickOfClass[(int32)EBrickClass::Empty] = 1;
+							else if(BrickClassByMaterial[LocalBrickMaterials[LocalBrickIndex]] == EBrickClass::Translucent)
+								HasAdjacentBrickOfClass[(int32)EBrickClass::Translucent] = 1;
+							else if (BrickClassByMaterial[LocalBrickMaterials[LocalBrickIndex]] == EBrickClass::Opaque)
+								HasAdjacentBrickOfClass[(int32)EBrickClass::Opaque] = 1;
+							
 
 							if(LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
 							{
@@ -418,16 +443,24 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							}
 						}
 
-						if (IsTranslucentBrick)
+						if ((HasAdjacentBrickOfClass[(int32)EBrickClass::Opaque]
+							+ HasAdjacentBrickOfClass[(int32)EBrickClass::Translucent]
+							+ HasAdjacentBrickOfClass[(int32)EBrickClass::Empty]) > 1)
+							/*if((HasAdjacentTranslucentBricks && HasAdjacentEmptyBricks)
+							|| (HasAdjacentOpaqueBricks && HasAdjacentEmptyBricks)
+							|| (HasAdjacentOpaqueBricks && HasAdjacentTranslucentBricks))*/
 						{
 							VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
 							new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
 								LocalVertexCoordinates,
 								LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
 								);
-
-
 						}
+						else
+						{
+							VertexIndexMap.Add(0);
+						}
+						/*
 						if (!IsTranslucentBrick)
 						{
 							if (HasEmptyAdjacentBrick && HasNonEmptyAdjacentBrick)
@@ -443,6 +476,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 								VertexIndexMap.Add(0);
 							}
 						}
+						*/
 					}
 				}
 			}
@@ -496,7 +530,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 			// Create mesh elements for each batch.
 			int32 NumIndices = 0;
-			for(int32 BrickMaterialIndex = 0; BrickMaterialIndex < MaterialBatches.Num(); ++BrickMaterialIndex)
+			for (int32 BrickMaterialIndex = 0; BrickMaterialIndex < MaterialBatches.Num(); ++BrickMaterialIndex)
 			{
 				for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 				{
