@@ -337,15 +337,20 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 {
 	const double StartTime = FPlatformTime::Seconds();
 	TArray<EBrickClass> BrickClassByMaterial;
-	for (int32 iterator = 1; iterator < Grid->Parameters.Materials.Num(); ++iterator)
+	for (int32 iterator = 0; iterator < Grid->Parameters.Materials.Num(); ++iterator)
 	{
-		if (Grid->Parameters.Materials[iterator].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
+		if (iterator == Grid->Parameters.EmptyMaterialIndex)
+			BrickClassByMaterial.Add(EBrickClass::Empty);
+		else
 		{
-			BrickClassByMaterial.Add(EBrickClass::Translucent);
-		}
-		else if (Grid->Parameters.Materials[iterator].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Opaque)
-		{
-			BrickClassByMaterial.Add(EBrickClass::Opaque);
+			if (Grid->Parameters.Materials[iterator].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
+			{
+				BrickClassByMaterial.Add(EBrickClass::Translucent);
+			}
+			else if (Grid->Parameters.Materials[iterator].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Opaque)
+			{
+				BrickClassByMaterial.Add(EBrickClass::Opaque);
+			}
 		}
 	}
 	HasLowPriorityUpdatePending = false;
@@ -472,7 +477,8 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 								const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
 								const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
 								const uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
-								if (FrontBrickMaterial == EmptyMaterialIndex || (!Grid->Parameters.TranslucentMaterialsIndexes.Contains(BrickMaterial) && Grid->Parameters.TranslucentMaterialsIndexes.Contains(FrontBrickMaterial)))
+
+								if (BrickClassByMaterial[BrickMaterial] > BrickClassByMaterial[FrontBrickMaterial])
 								{
 									uint16 FaceVertexIndices[4];
 									for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)
