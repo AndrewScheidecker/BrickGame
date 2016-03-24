@@ -31,6 +31,14 @@ static const FInt3 FaceNormals[6] =
 	FInt3(0, 0, +1)
 };
 
+enum class EBrickClass
+{
+	Empty = 0,
+	Translucent = 1,
+	Opaque = 2,
+	Count = 3
+};
+
 /**	An element of the vertex buffer given to the GPU by the CPU brick tessellator.
 	8-bit coordinates are used for efficiency. */
 struct FBrickVertex
@@ -328,7 +336,26 @@ UBrickRenderComponent::UBrickRenderComponent( const FObjectInitializer& Initiali
 FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 {
 	const double StartTime = FPlatformTime::Seconds();
-
+	TArray<EBrickClass> BrickClassByMaterial;
+	for (int32 MaterialIndex = 0; MaterialIndex < Grid->Parameters.Materials.Num(); ++MaterialIndex)
+	{
+		if (MaterialIndex == Grid->Parameters.EmptyMaterialIndex)
+		{
+			BrickClassByMaterial.Add(EBrickClass::Empty);
+		}
+		else
+		{
+			if (Grid->Parameters.Materials[MaterialIndex].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Opaque)
+			{
+				BrickClassByMaterial.Add(EBrickClass::Opaque);
+			}
+			else
+			{
+				BrickClassByMaterial.Add(EBrickClass::Translucent);
+			}
+			
+		}
+	}
 	HasLowPriorityUpdatePending = false;
 
 	const FInt3 MinBrickCoordinates = Coordinates << Grid->BricksPerRenderChunkLog2;
@@ -396,24 +423,20 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 					for(int32 LocalVertexZ = 0; LocalVertexZ < LocalVertexDim.Z; ++LocalVertexZ)
 					{
 						const FInt3 LocalVertexCoordinates(LocalVertexX,LocalVertexY,LocalVertexZ);
+						uint32 HasAdjacentBrickOfClass[(int32)EBrickClass::Count] = { 0 };
 
-						bool HasEmptyAdjacentBrick = false;
-						bool HasNonEmptyAdjacentBrick = false;
 						for(uint32 AdjacentBrickIndex = 0;AdjacentBrickIndex < 8;++AdjacentBrickIndex)
 						{
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
 							const uint32 LocalBrickIndex = (LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z;
-							if(LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
-							{
-								HasEmptyAdjacentBrick = true;
-							}
-							else
-							{
-								HasNonEmptyAdjacentBrick = true;
-							}
+							
+							const uint32 BrickClass = (uint32)BrickClassByMaterial[LocalBrickMaterials[LocalBrickIndex]];
+							HasAdjacentBrickOfClass[BrickClass] = 1;
 						}
 
-						if(HasEmptyAdjacentBrick && HasNonEmptyAdjacentBrick)
+						if ((HasAdjacentBrickOfClass[(int32)EBrickClass::Opaque]
+							+ HasAdjacentBrickOfClass[(int32)EBrickClass::Translucent]
+							+ HasAdjacentBrickOfClass[(int32)EBrickClass::Empty]) > 1)
 						{
 							VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
 							new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
@@ -450,7 +473,8 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 								const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
 								const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
 								const uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
-								if(FrontBrickMaterial == EmptyMaterialIndex)
+
+								if (BrickClassByMaterial[BrickMaterial] > BrickClassByMaterial[FrontBrickMaterial])
 								{
 									uint16 FaceVertexIndices[4];
 									for (uint32 FaceVertexIndex = 0; FaceVertexIndex < 4; ++FaceVertexIndex)
@@ -478,7 +502,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 			// Create mesh elements for each batch.
 			int32 NumIndices = 0;
-			for(int32 BrickMaterialIndex = 0; BrickMaterialIndex < MaterialBatches.Num(); ++BrickMaterialIndex)
+			for (int32 BrickMaterialIndex = 0; BrickMaterialIndex < MaterialBatches.Num(); ++BrickMaterialIndex)
 			{
 				for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 				{
