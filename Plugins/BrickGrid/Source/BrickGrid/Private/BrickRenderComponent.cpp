@@ -337,20 +337,23 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 {
 	const double StartTime = FPlatformTime::Seconds();
 	TArray<EBrickClass> BrickClassByMaterial;
-	for (int32 iterator = 0; iterator < Grid->Parameters.Materials.Num(); ++iterator)
+	for (int32 MaterialIndex = 0; MaterialIndex < Grid->Parameters.Materials.Num(); ++MaterialIndex)
 	{
-		if (iterator == Grid->Parameters.EmptyMaterialIndex)
+		if (MaterialIndex == Grid->Parameters.EmptyMaterialIndex)
+		{
 			BrickClassByMaterial.Add(EBrickClass::Empty);
+		}
 		else
 		{
-			if (Grid->Parameters.Materials[iterator].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Translucent)
-			{
-				BrickClassByMaterial.Add(EBrickClass::Translucent);
-			}
-			else if (Grid->Parameters.Materials[iterator].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Opaque)
+			if (Grid->Parameters.Materials[MaterialIndex].SurfaceMaterial->GetBlendMode() == EBlendMode::BLEND_Opaque)
 			{
 				BrickClassByMaterial.Add(EBrickClass::Opaque);
 			}
+			else
+			{
+				BrickClassByMaterial.Add(EBrickClass::Translucent);
+			}
+			
 		}
 	}
 	HasLowPriorityUpdatePending = false;
@@ -427,20 +430,13 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
 							const uint32 LocalBrickIndex = (LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z;
 							
-							if (LocalBrickMaterials[LocalBrickIndex] == EmptyMaterialIndex)
-								HasAdjacentBrickOfClass[(int32)EBrickClass::Empty] = 1;
-							else if(BrickClassByMaterial[LocalBrickMaterials[LocalBrickIndex]] == EBrickClass::Translucent)
-								HasAdjacentBrickOfClass[(int32)EBrickClass::Translucent] = 1;
-							else if (BrickClassByMaterial[LocalBrickMaterials[LocalBrickIndex]] == EBrickClass::Opaque)
-								HasAdjacentBrickOfClass[(int32)EBrickClass::Opaque] = 1;
+							const uint32 BrickClass = (uint32)BrickClassByMaterial[LocalBrickMaterials[LocalBrickIndex]];
+							HasAdjacentBrickOfClass[BrickClass] = 1;
 						}
 
 						if ((HasAdjacentBrickOfClass[(int32)EBrickClass::Opaque]
 							+ HasAdjacentBrickOfClass[(int32)EBrickClass::Translucent]
 							+ HasAdjacentBrickOfClass[(int32)EBrickClass::Empty]) > 1)
-							/*if((HasAdjacentTranslucentBricks && HasAdjacentEmptyBricks)
-							|| (HasAdjacentOpaqueBricks && HasAdjacentEmptyBricks)
-							|| (HasAdjacentOpaqueBricks && HasAdjacentTranslucentBricks))*/
 						{
 							VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
 							new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
