@@ -57,6 +57,12 @@ struct FBrickTerrainGenerationParameters
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
 	FNoiseFunction ErodedHeightFunction;
+	
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	FNoiseFunction UnerodedRockHeightFunction;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	FNoiseFunction ErodedRockHeightFunction;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
 	FNoiseFunction MoistureFunction;
@@ -81,10 +87,21 @@ struct FBrickTerrainGenerationParameters
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
 	float GrassMoistureThreshold;
-
-	// The material index for rock.
+	
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
-	int32 RockMaterialIndex;
+	float SandstoneMoistureThreshold;
+
+	// The material for sandstone
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	int32 SandstoneMaterialIndex;
+
+	// The material for eroded rock
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	int32 ErodedRockMaterialIndex;
+
+	// The material for uneroded rock
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")
+	int32 UnerodedRockMaterialIndex;
 
 	// The material index for dirt.
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Terrain Generation")

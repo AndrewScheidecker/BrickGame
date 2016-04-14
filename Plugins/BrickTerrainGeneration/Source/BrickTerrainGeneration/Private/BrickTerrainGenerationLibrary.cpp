@@ -102,15 +102,18 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 				const int32 X = MinRegionBrickCoordinates.X + LocalX;
 				const int32 Y = MinRegionBrickCoordinates.Y + LocalY;
 				const float Erosion = LocalErosionFunction.Sample2D(BiasedSeed * 59 + X,Y);
-				const float UnerodedGroundHeight = LocalUnerodedHeightFunction.Sample2D(BiasedSeed * 67 + X,Y) * NoiseToLocalScale;
-				const float ErodedGroundHeight = LocalErodedHeightFunction.Sample2D(BiasedSeed * 71 + X,Y) * NoiseToLocalScale;
-				const float RockHeight = FMath::Lerp(UnerodedGroundHeight,ErodedGroundHeight,Erosion);
+				const float UnerodedRockHeight = LocalUnerodedHeightFunction.Sample2D(BiasedSeed * 67 + X,Y) * NoiseToLocalScale * (1-Erosion);
+				const float ErodedRockHeight = LocalErodedHeightFunction.Sample2D(BiasedSeed * 71 + X,Y) * NoiseToLocalScale;
+				const float RockHeight = FMath::Max(UnerodedRockHeight,ErodedRockHeight);
 				const float BaseDirtThickness = LocalDirtThicknessFunction.Sample2D(BiasedSeed * 79 + X,Y) * NoiseToLocalScale;
 				const float DirtThicknessFactor = Parameters.DirtThicknessFactorByHeight->FloatCurve.Eval(RockHeight * LocalToWorldScale);
 				const float DirtThickness = FMath::Max(0.0f,BaseDirtThickness * DirtThicknessFactor);
 				const float GroundHeight = RockHeight + DirtThickness;
+				const float Moisture = LocalMoistureFunction.Sample2D(BiasedSeed * 61 + X,Y);
 
-				const int32 BrickRockHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FPlatformMath::CeilToInt(RockHeight));
+				const int32 BrickUnerodedRockHeight = FPlatformMath::CeilToInt(RockHeight);
+				const int32 BrickErodedRockHeight = FPlatformMath::CeilToInt(ErodedRockHeight);
+				const int32 BrickRockHeight = FMath::CeilToInt(RockHeight);
 				const int32 BrickGroundHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FPlatformMath::CeilToInt(GroundHeight));
 
 				float CavernProbabilitySamples[BrickGridConstants::MaxBricksPerRegionAxis];
@@ -131,7 +134,7 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 				{
 					const int32 Z = MinRegionBrickCoordinates.Z + LocalZ;
 					const FInt3 BrickCoordinates(X,Y,Z);
-					int32 MaterialIndex = 0;
+					int32 MaterialIndex = Grid->Parameters.EmptyMaterialIndex;
 					if(Z == Grid->MinBrickCoordinates.Z)
 					{
 						MaterialIndex = Parameters.BottomMaterialIndex;
@@ -144,14 +147,28 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 						{
 							if(CavernProbability > RockCavernThreshold)
 							{
-								MaterialIndex = Parameters.RockMaterialIndex;
+								if(Z <= BrickErodedRockHeight)
+								{
+									if(Moisture < Parameters.SandstoneMoistureThreshold)
+									{
+										MaterialIndex = Parameters.SandstoneMaterialIndex;
+									}
+									else
+									{
+										MaterialIndex = Parameters.ErodedRockMaterialIndex;
+									}
+								}
+								else
+								{
+									MaterialIndex = Parameters.UnerodedRockMaterialIndex;
+								}
 							}
 						}
 						else
 						{
 							if(CavernProbability > RockCavernThreshold + Parameters.DirtCavernThresholdBias)
 							{
-								MaterialIndex = Z == BrickGroundHeight && LocalMoistureFunction.Sample2D(BiasedSeed * 61 + X,Y) > Parameters.GrassMoistureThreshold
+								MaterialIndex = Z == BrickGroundHeight && Moisture > Parameters.GrassMoistureThreshold
 									? Parameters.GrassMaterialIndex
 									: Parameters.DirtMaterialIndex;
 							}
@@ -163,7 +180,7 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 		}
 	}
 
-	// Wait for all the YSlice tasks to complete.
+	// Wait for all the XYSlice tasks to complete.
 	FTaskGraphInterface::Get().WaitUntilTasksComplete(XYStackCompletionEvents,ENamedThreads::GameThread);
 
 	Grid->SetBrickMaterialArray(MinRegionBrickCoordinates,MaxRegionBrickCoordinates,LocalBrickMaterials);

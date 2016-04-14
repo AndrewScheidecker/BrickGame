@@ -411,9 +411,11 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 
 			// Compute the ambient occlusion for the vertices in this chunk.
 			const FInt3 LocalVertexDim = Grid->BricksPerRenderChunk + FInt3::Scalar(1);
-			TArray<uint8> LocalVertexAmbientFactors;
-			LocalVertexAmbientFactors.SetNumUninitialized(LocalVertexDim.X * LocalVertexDim.Y * LocalVertexDim.Z);
-			ComputeChunkAO(Grid,MinLocalBrickCoordinates,LocalBrickExpansion,LocalBricksDim,LocalVertexDim,LocalBrickMaterials,LocalVertexAmbientFactors);
+			#if !WITH_GFSDK_VXGI
+				TArray<uint8> LocalVertexAmbientFactors;
+				LocalVertexAmbientFactors.SetNumUninitialized(LocalVertexDim.X * LocalVertexDim.Y * LocalVertexDim.Z);
+				ComputeChunkAO(Grid,MinLocalBrickCoordinates,LocalBrickExpansion,LocalBricksDim,LocalVertexDim,LocalBrickMaterials,LocalVertexAmbientFactors);
+			#endif
 
 			// Create an array of the vertices needed to render this chunk, along with a map from 3D coordinates to indices.
 			TArray<uint16> VertexIndexMap;
@@ -443,7 +445,11 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
 							new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
 								LocalVertexCoordinates,
-								LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
+								#if WITH_GFSDK_VXGI
+									255
+								#else
+									LocalVertexAmbientFactors[(LocalVertexCoordinates.Y * LocalVertexDim.X + LocalVertexCoordinates.X) * LocalVertexDim.Z + LocalVertexCoordinates.Z]
+								#endif
 								);
 						}
 						else
