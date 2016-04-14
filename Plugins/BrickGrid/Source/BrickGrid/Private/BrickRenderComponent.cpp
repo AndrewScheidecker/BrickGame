@@ -21,7 +21,7 @@ static const uint8 FaceVertices[6][4] =
 	{ 1, 3, 7, 5 }		// +Z
 };
 // Maps face index to normal.
-static const FInt3 FaceNormals[6] =
+const FInt3 FaceNormals[6] =
 {
 	FInt3(-1, 0, 0),
 	FInt3(+1, 0, 0),

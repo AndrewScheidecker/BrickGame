@@ -5,17 +5,6 @@
 #include "BrickGridComponent.h"
 #include "PhysicsEngine/BodySetup.h"
 
-// Maps face index to normal.
-static const FInt3 FaceNormals[6] =
-{
-	FInt3(-1, 0, 0),
-	FInt3(+1, 0, 0),
-	FInt3(0, -1, 0),
-	FInt3(0, +1, 0),
-	FInt3(0, 0, -1),
-	FInt3(0, 0, +1)
-};
-
 UBrickCollisionComponent::UBrickCollisionComponent( const FObjectInitializer& Initializer)
 	: Super(Initializer)
 {
