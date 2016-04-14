@@ -390,6 +390,8 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 	FBrickChunkSceneProxy* SceneProxy = NULL;
 	if(HasNonEmptyBrick)
 	{
+		const ERHIFeatureLevel::Type SceneFeatureLevel = GetScene()->GetFeatureLevel();
+
 		SceneProxy = new FBrickChunkSceneProxy(this,MoveTemp(LocalBrickMaterialsGameThread));
 		SceneProxy->SetupCompletionEvent = FFunctionGraphTask::CreateAndDispatchWhenReady([=]()
 		{
@@ -517,13 +519,13 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 				{
 					SurfaceMaterial = UMaterial::GetDefaultMaterial(MD_Surface);
 				}
-				SceneProxy->MaterialRelevance |= SurfaceMaterial->GetRelevance_Concurrent(GetScene()->GetFeatureLevel());
+				SceneProxy->MaterialRelevance |= SurfaceMaterial->GetRelevance_Concurrent(SceneFeatureLevel);
 				const int32 ProxyMaterialIndex = SceneProxy->Materials.AddUnique(SurfaceMaterial);
 
 				UMaterialInterface* OverrideTopSurfaceMaterial = Grid->Parameters.Materials[BrickMaterialIndex].OverrideTopSurfaceMaterial;
 				if(OverrideTopSurfaceMaterial)
 				{
-					SceneProxy->MaterialRelevance |= OverrideTopSurfaceMaterial->GetRelevance_Concurrent(GetScene()->GetFeatureLevel());
+					SceneProxy->MaterialRelevance |= OverrideTopSurfaceMaterial->GetRelevance_Concurrent(SceneFeatureLevel);
 				}
 				const int32 TopProxyMaterialIndex = OverrideTopSurfaceMaterial ? SceneProxy->Materials.AddUnique(OverrideTopSurfaceMaterial) : ProxyMaterialIndex;
 
