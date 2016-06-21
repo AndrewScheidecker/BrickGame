@@ -45,12 +45,12 @@ void UBrickGridComponent::Init(const FBrickGridParameters& InParameters)
 	RegionCoordinatesToIndex.Empty();
 	for(auto ChunkIt = RenderChunkCoordinatesToComponent.CreateConstIterator();ChunkIt;++ChunkIt)
 	{
-		ChunkIt.Value()->DetachFromParent();
+		ChunkIt.Value()->DetachFromComponent(FDetachmentTransformRules(EDetachmentRule::KeepRelative,false));
 		ChunkIt.Value()->DestroyComponent();
 	}
 	for(auto ChunkIt = CollisionChunkCoordinatesToComponent.CreateConstIterator();ChunkIt;++ChunkIt)
 	{
-		ChunkIt.Value()->DetachFromParent();
+		ChunkIt.Value()->DetachFromComponent(FDetachmentTransformRules(EDetachmentRule::KeepRelative,false));
 		ChunkIt.Value()->DestroyComponent();
 	}
 	RenderChunkCoordinatesToComponent.Empty();
@@ -405,7 +405,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 			);
 		if(ChunkBounds.ComputeSquaredDistanceToPoint(LocalViewPosition) > FMath::Square(LocalMaxDrawDistance))
 		{
-			ChunkIt.Value()->DetachFromParent();
+			ChunkIt.Value()->DetachFromComponent(FDetachmentTransformRules(EDetachmentRule::KeepRelative,false));
 			ChunkIt.Value()->DestroyComponent();
 			ChunkIt.RemoveCurrent();
 		}
@@ -435,7 +435,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 
 						// Set the component transform and register it.
 						RenderComponent->SetRelativeLocation((ChunkCoordinates * BricksPerRenderChunk).ToFloat());
-						RenderComponent->AttachTo(this);
+						RenderComponent->AttachToComponent(this,FAttachmentTransformRules(EAttachmentRule::KeepRelative,false));
 						RenderComponent->RegisterComponent();
 
 						// Add the chunk to the coordinate map and visible chunk array.
@@ -464,7 +464,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 		||	FInt3::Any(ChunkIt.Key() > MaxCollisionChunkCoordinates)
 		||	ChunkBounds.ComputeSquaredDistanceToPoint(LocalViewPosition) > FMath::Square(LocalMaxCollisionDistance))
 		{
-			ChunkIt.Value()->DetachFromParent();
+			ChunkIt.Value()->DetachFromComponent(FDetachmentTransformRules(EDetachmentRule::KeepRelative,false));
 			ChunkIt.Value()->DestroyComponent();
 			ChunkIt.RemoveCurrent();
 		}
@@ -488,7 +488,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 
 						// Set the component transform and register it.
 						Chunk->SetRelativeLocation((ChunkCoordinates * BricksPerCollisionChunk).ToFloat());
-						Chunk->AttachTo(this);
+						Chunk->AttachToComponent(this,FAttachmentTransformRules(EAttachmentRule::KeepRelative,false));
 						Chunk->RegisterComponent();
 
 						// Add the chunk to the coordinate map and visible chunk array.
