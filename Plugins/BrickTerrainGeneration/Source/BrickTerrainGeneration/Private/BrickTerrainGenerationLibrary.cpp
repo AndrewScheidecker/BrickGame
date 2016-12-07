@@ -122,16 +122,16 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 
 					float CavernProbabilitySamples[BrickGridConstants::MaxBricksPerRegionAxis];
 					const uint32 NumCavernProbabilitySamples = FMath::Min(BrickGridConstants::MaxBricksPerRegionAxis >> 2,(BrickGroundHeight + 3) >> 2);
-					float PreviousCavernProbabilitySample = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z - 1);
+					CavernProbabilitySamples[0] = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z);
 					for(uint32 CavernSampleIndex = 0;CavernSampleIndex < NumCavernProbabilitySamples;++CavernSampleIndex)
 					{
 						const uint32 LocalZ = CavernSampleIndex << 2;
-						const float NextCavernProbabilitySample = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z + LocalZ + 3);
-						CavernProbabilitySamples[LocalZ + 0] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,1.0f / 4.0f);
-						CavernProbabilitySamples[LocalZ + 1] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,2.0f / 4.0f);
-						CavernProbabilitySamples[LocalZ + 2] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,3.0f / 4.0f);
-						CavernProbabilitySamples[LocalZ + 3] = NextCavernProbabilitySample;
-						PreviousCavernProbabilitySample = NextCavernProbabilitySample;
+						const float PreviousCavernProbabilitySample = CavernProbabilitySamples[LocalZ + 0];
+						const float NextCavernProbabilitySample = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z + LocalZ + 4);
+						CavernProbabilitySamples[LocalZ + 1] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,1.0f / 4.0f);
+						CavernProbabilitySamples[LocalZ + 2] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,2.0f / 4.0f);
+						CavernProbabilitySamples[LocalZ + 3] = FMath::Lerp(PreviousCavernProbabilitySample,NextCavernProbabilitySample,3.0f / 4.0f);
+						CavernProbabilitySamples[LocalZ + 4] = NextCavernProbabilitySample;
 					}
 
 					for(int32 LocalZ = 0;LocalZ < BricksPerRegion.Z;++LocalZ)

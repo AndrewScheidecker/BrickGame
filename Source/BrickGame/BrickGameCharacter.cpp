@@ -18,7 +18,7 @@ ABrickGameCharacter::ABrickGameCharacter(const class FObjectInitializer& Initial
 
 	// Create a CameraComponent	
 	FirstPersonCameraComponent = Initializer.CreateDefaultSubobject<UCameraComponent>(this, TEXT("FirstPersonCamera"));
-	FirstPersonCameraComponent->AttachParent = GetCapsuleComponent();
+	FirstPersonCameraComponent->AttachToComponent(GetCapsuleComponent(),FAttachmentTransformRules::KeepRelativeTransform);
 	FirstPersonCameraComponent->RelativeLocation = FVector(0, 0, 64.f); // Position the camera
 }
 
