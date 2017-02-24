@@ -499,6 +499,81 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 	}
 }
 
+bool UBrickGridComponent::SaveCompressed(FString path)
+{
+	FBufferArchive bufArchive;
+
+	FBrickGridData toBeSaved;
+	toBeSaved.Regions = Regions;
+	bufArchive << toBeSaved;
+
+	UE_LOG(LogStats, Log, TEXT("Precompressed File Size: %s"), *FString::FromInt(bufArchive.Num()));
+
+	TArray<uint8> compressedData;
+	FArchiveSaveCompressedProxy proxy = FArchiveSaveCompressedProxy(compressedData, COMPRESS_ZLIB);
+
+	proxy << bufArchive;
+
+	proxy.Flush();
+
+	UE_LOG(LogStats, Log, TEXT("Compressed File Size: %s"), *FString::FromInt(compressedData.Num()));
+
+	bool saveResult = FFileHelper::SaveArrayToFile(compressedData, *path);
+
+	proxy.FlushCache();
+	compressedData.Empty();
+
+	bufArchive.FlushCache();
+	bufArchive.Empty();
+
+	if (saveResult)
+		bufArchive.Close();
+
+	return saveResult;
+}
+
+bool UBrickGridComponent::LoadCompressed(FString path)
+{
+	if (!FPaths::FileExists(path))
+		return false;
+
+	TArray<uint8> compressedData;
+	if (!FFileHelper::LoadFileToArray(compressedData, *path))
+	{
+		UE_LOG(LogStats, Error, TEXT("File seems invalid!"));
+		return false;
+	}
+
+	FArchiveLoadCompressedProxy proxy = FArchiveLoadCompressedProxy(compressedData, COMPRESS_ZLIB);
+
+	if (proxy.GetError())
+	{
+		UE_LOG(LogStats, Error, TEXT("The file could not be decompressed! Is it compressed?"));
+		return false;
+	}
+
+	FBufferArchive bufArchive;
+	proxy << bufArchive;
+
+	FMemoryReader memReader = FMemoryReader(bufArchive, true);
+	memReader.Seek(0);
+
+	FBrickGridData toBeLoaded;
+
+	memReader << toBeLoaded;
+
+	SetData(toBeLoaded);
+
+	compressedData.Empty();
+	proxy.FlushCache();
+	memReader.FlushCache();
+
+	bufArchive.Empty();
+	bufArchive.Close();
+
+	return true;
+}
+
 FBoxSphereBounds UBrickGridComponent::CalcBounds(const FTransform & LocalToWorld) const
 {
 	// Return a bounds that fills the world.

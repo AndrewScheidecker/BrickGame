@@ -103,6 +103,13 @@ struct FInt3
 	{
 		return A.X == B.X && A.Y == B.Y && A.Z == B.Z;
 	}
+	friend FArchive& operator<<(FArchive& Ar, FInt3& other)
+	{
+		Ar << other.X;
+		Ar << other.Y;
+		Ar << other.Z;
+		return Ar;
+	}
 	static inline FInt3 SignedShiftRight(const FInt3& A,const FInt3& B)
 	{
 		return FInt3(::SignedShiftRight(A.X,B.X),::SignedShiftRight(A.Y,B.Y),::SignedShiftRight(A.Z,B.Z));
@@ -215,6 +222,24 @@ struct FBrickGridData
 	TArray<struct FBrickRegion> Regions;
 };
 
+//Overload << for FBrickRegion
+FORCEINLINE FArchive& operator<<(FArchive& Ar, FBrickRegion& data)
+{
+	Ar << data.BrickContents; //TArray<uint8>
+	Ar << data.Coordinates; //Fint3
+	Ar << data.MaxNonEmptyBrickRegionZs; //TArray<int8>
+
+	return Ar;
+}
+
+//Overload << for FBrickGridData
+FORCEINLINE FArchive& operator<<(FArchive& Ar, FBrickGridData& data)
+{
+	Ar << data.Regions;
+
+	return Ar;
+}
+
 // The type of OnInitRegion delegates.
 DECLARE_DYNAMIC_DELEGATE_OneParam(FBrickGrid_InitRegion,FInt3,RegionCoordinates);
 
@@ -261,6 +286,14 @@ public:
 	// Updates the visible chunks for a given view position.
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	void Update(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,float MaxDesiredUpdateTime,FBrickGrid_InitRegion InitRegion);
+
+	// Saves the current brick grid into an zlib compressed file
+	UFUNCTION(BlueprintCallable, Category = "Brick Grid")
+	bool SaveCompressed(FString path);
+
+	// Loads a saved brick grid into the current component
+	UFUNCTION(BlueprintCallable, Category = "Brick Grid")
+	bool LoadCompressed(FString path);
 
 	// The parameters for the grid.
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
