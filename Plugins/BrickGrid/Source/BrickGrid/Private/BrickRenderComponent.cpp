@@ -145,16 +145,14 @@ public:
 		});
 	}
 
-	#if UE4_HAS_IMPROVED_MESHBATCH_ELEMENT_VISIBILITY
-		virtual uint64 GetStaticBatchElementVisibility(const class FSceneView& View, const struct FMeshBatch* Batch) const override
-		{
-			return IsStaticBatchVisible(View.ViewMatrices.ViewOrigin,Batch) ? 1 : 0;
-		}
-		virtual uint64 GetStaticBatchElementShadowVisibility(const class FSceneView& View, const FLightSceneProxy* LightSceneProxy, const struct FMeshBatch* Batch) const override
-		{
-			return IsStaticBatchVisible(LightSceneProxy->GetPosition(),Batch) ? 1 : 0;
-		}
-	#endif
+	virtual uint64 GetStaticBatchElementVisibility(const class FSceneView& View, const struct FMeshBatch* Batch) const override
+	{
+		return IsStaticBatchVisible(View.ViewMatrices.GetViewOrigin(),Batch) ? 1 : 0;
+	}
+	virtual uint64 GetStaticBatchElementShadowVisibility(const class FSceneView& View, const FLightSceneProxy* LightSceneProxy, const struct FMeshBatch* Batch) const override
+	{
+		return IsStaticBatchVisible(LightSceneProxy->GetPosition(),Batch) ? 1 : 0;
+	}
 
 private:
 
@@ -163,7 +161,6 @@ private:
 
 	bool IsStaticBatchVisible(const FVector4& ViewPosition,const struct FMeshBatch* Batch) const
 	{
-		const uint8 FaceIndex = Batch->Elements[0].UserIndex;
 		const FBox BoundingBox = PrimitiveSceneProxy->GetBounds().GetBox();
 		const FVector MinRelativePosition = ViewPosition - BoundingBox.Min * ViewPosition.W;
 		const FVector MaxRelativePosition = ViewPosition - BoundingBox.Max * ViewPosition.W;
@@ -308,9 +305,7 @@ public:
 		OutBatch.Type = PT_TriangleList;
 		OutBatch.DepthPriorityGroup = SDPG_World;
 		OutBatch.CastShadow = true;
-		#if UE4_HAS_IMPROVED_MESHBATCH_ELEMENT_VISIBILITY
-			OutBatch.bRequiresPerElementVisibility = true;
-		#endif
+		OutBatch.bRequiresPerElementVisibility = true;
 		OutBatch.Elements[0].FirstIndex = Element.FirstIndex;
 		OutBatch.Elements[0].NumPrimitives = Element.NumPrimitives;
 		OutBatch.Elements[0].MinVertexIndex = 0;
@@ -387,16 +382,16 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 	}
 
 	// Only create a scene proxy if there are some non-empty bricks in the chunk.
-	FBrickChunkSceneProxy* SceneProxy = NULL;
+	FBrickChunkSceneProxy* BrickSceneProxy = NULL;
 	if(HasNonEmptyBrick)
 	{
 		const ERHIFeatureLevel::Type SceneFeatureLevel = GetScene()->GetFeatureLevel();
 
-		SceneProxy = new FBrickChunkSceneProxy(this,MoveTemp(LocalBrickMaterialsGameThread));
-		SceneProxy->SetupCompletionEvent = FFunctionGraphTask::CreateAndDispatchWhenReady([=]()
+		BrickSceneProxy = new FBrickChunkSceneProxy(this,MoveTemp(LocalBrickMaterialsGameThread));
+		BrickSceneProxy->SetupCompletionEvent = FFunctionGraphTask::CreateAndDispatchWhenReady([=]()
 		{
-			const double StartTime = FPlatformTime::Seconds();
-			const TArray<uint8>& LocalBrickMaterials = SceneProxy->LocalBrickMaterials;
+			const double SetupStartTime = FPlatformTime::Seconds();
+			const TArray<uint8>& LocalBrickMaterials = BrickSceneProxy->LocalBrickMaterials;
 		
 			struct FFaceBatch
 			{
@@ -442,8 +437,8 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							+ HasAdjacentBrickOfClass[(int32)EBrickClass::Translucent]
 							+ HasAdjacentBrickOfClass[(int32)EBrickClass::Empty]) > 1)
 						{
-							VertexIndexMap.Add(SceneProxy->VertexBuffer.Vertices.Num());
-							new(SceneProxy->VertexBuffer.Vertices) FBrickVertex(
+							VertexIndexMap.Add(BrickSceneProxy->VertexBuffer.Vertices.Num());
+							new(BrickSceneProxy->VertexBuffer.Vertices) FBrickVertex(
 								LocalVertexCoordinates,
 								#if WITH_GFSDK_VXGI
 									255
@@ -517,7 +512,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 					NumIndices += MaterialBatches[BrickMaterialIndex].FaceBatches[FaceIndex].Indices.Num();
 				}
 			}
-			SceneProxy->IndexBuffer.Indices.Empty(NumIndices);
+			BrickSceneProxy->IndexBuffer.Indices.Empty(NumIndices);
 			for(int32 BrickMaterialIndex = 0; BrickMaterialIndex < MaterialBatches.Num(); ++BrickMaterialIndex)
 			{
 				UMaterialInterface* SurfaceMaterial = Grid->Parameters.Materials[BrickMaterialIndex].SurfaceMaterial;
@@ -525,45 +520,45 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 				{
 					SurfaceMaterial = UMaterial::GetDefaultMaterial(MD_Surface);
 				}
-				SceneProxy->MaterialRelevance |= SurfaceMaterial->GetRelevance_Concurrent(SceneFeatureLevel);
-				const int32 ProxyMaterialIndex = SceneProxy->Materials.AddUnique(SurfaceMaterial);
+				BrickSceneProxy->MaterialRelevance |= SurfaceMaterial->GetRelevance_Concurrent(SceneFeatureLevel);
+				const int32 ProxyMaterialIndex = BrickSceneProxy->Materials.AddUnique(SurfaceMaterial);
 
 				UMaterialInterface* OverrideTopSurfaceMaterial = Grid->Parameters.Materials[BrickMaterialIndex].OverrideTopSurfaceMaterial;
 				if(OverrideTopSurfaceMaterial)
 				{
-					SceneProxy->MaterialRelevance |= OverrideTopSurfaceMaterial->GetRelevance_Concurrent(SceneFeatureLevel);
+					BrickSceneProxy->MaterialRelevance |= OverrideTopSurfaceMaterial->GetRelevance_Concurrent(SceneFeatureLevel);
 				}
-				const int32 TopProxyMaterialIndex = OverrideTopSurfaceMaterial ? SceneProxy->Materials.AddUnique(OverrideTopSurfaceMaterial) : ProxyMaterialIndex;
+				const int32 TopProxyMaterialIndex = OverrideTopSurfaceMaterial ? BrickSceneProxy->Materials.AddUnique(OverrideTopSurfaceMaterial) : ProxyMaterialIndex;
 
 				for(uint32 FaceIndex = 0;FaceIndex < 6;++FaceIndex)
 				{
 					const FFaceBatch& FaceBatch = MaterialBatches[BrickMaterialIndex].FaceBatches[FaceIndex];
 					if (FaceBatch.Indices.Num() > 0)
 					{
-						FBrickChunkSceneProxy::FElement& Element = *new(SceneProxy->Elements)FBrickChunkSceneProxy::FElement;
-						Element.FirstIndex = SceneProxy->IndexBuffer.Indices.Num();
+						FBrickChunkSceneProxy::FElement& Element = *new(BrickSceneProxy->Elements)FBrickChunkSceneProxy::FElement;
+						Element.FirstIndex = BrickSceneProxy->IndexBuffer.Indices.Num();
 						Element.NumPrimitives = FaceBatch.Indices.Num() / 3;
 						Element.MaterialIndex = FaceIndex == 5 ? TopProxyMaterialIndex : ProxyMaterialIndex;
 						Element.FaceIndex = FaceIndex;
 
 						// Append the batch's indices to the index buffer.
-						SceneProxy->IndexBuffer.Indices.Append(FaceBatch.Indices);
+						BrickSceneProxy->IndexBuffer.Indices.Append(FaceBatch.Indices);
 					}
 				}
 			}
 
-			SceneProxy->LocalBrickMaterials.Empty();
+			BrickSceneProxy->LocalBrickMaterials.Empty();
 
-			UE_LOG(LogStats,Log,TEXT("Brick render component setup took %fms to create %u indices and %u vertices"),1000.0f * float(FPlatformTime::Seconds() - StartTime),SceneProxy->IndexBuffer.Indices.Num(),SceneProxy->VertexBuffer.Vertices.Num());
+			UE_LOG(LogStats,Log,TEXT("Brick render component setup took %fms to create %u indices and %u vertices"),1000.0f * float(FPlatformTime::Seconds() - SetupStartTime),BrickSceneProxy->IndexBuffer.Indices.Num(),BrickSceneProxy->VertexBuffer.Vertices.Num());
 
 		},TStatId(),NULL);
 
-		SceneProxy->BeginInitResources();
+		BrickSceneProxy->BeginInitResources();
 	}
 
 	UE_LOG(LogStats,Log,TEXT("UBrickRenderComponent::CreateSceneProxy took %fms"),1000.0f * float(FPlatformTime::Seconds() - StartTime));
 
-	return SceneProxy;
+	return BrickSceneProxy;
 }
 
 FBoxSphereBounds UBrickRenderComponent::CalcBounds(const FTransform & LocalToWorld) const

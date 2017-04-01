@@ -45,12 +45,12 @@ void UBrickGridComponent::Init(const FBrickGridParameters& InParameters)
 	RegionCoordinatesToIndex.Empty();
 	for(auto ChunkIt = RenderChunkCoordinatesToComponent.CreateConstIterator();ChunkIt;++ChunkIt)
 	{
-		ChunkIt.Value()->DetachFromParent();
+		ChunkIt.Value()->DetachFromComponent(FDetachmentTransformRules(EDetachmentRule::KeepRelative,false));
 		ChunkIt.Value()->DestroyComponent();
 	}
 	for(auto ChunkIt = CollisionChunkCoordinatesToComponent.CreateConstIterator();ChunkIt;++ChunkIt)
 	{
-		ChunkIt.Value()->DetachFromParent();
+		ChunkIt.Value()->DetachFromComponent(FDetachmentTransformRules(EDetachmentRule::KeepRelative,false));
 		ChunkIt.Value()->DestroyComponent();
 	}
 	RenderChunkCoordinatesToComponent.Empty();
@@ -95,29 +95,29 @@ FBrick UBrickGridComponent::GetBrick(const FInt3& BrickCoordinates) const
 	return FBrick(Parameters.EmptyMaterialIndex);
 }
 
-void UBrickGridComponent::GetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<uint8>& OutBrickMaterials) const
+void UBrickGridComponent::GetBrickMaterialArray(const FInt3& GetMinBrickCoordinates,const FInt3& GetMaxBrickCoordinates,TArray<uint8>& OutBrickMaterials) const
 {
-	const FInt3 OutputSize = MaxBrickCoordinates - MinBrickCoordinates + FInt3::Scalar(1);
-	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
-	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(MaxBrickCoordinates);
-	for(int32 RegionY = MinRegionCoordinates.Y;RegionY <= MaxRegionCoordinates.Y;++RegionY)
+	const FInt3 OutputSize = GetMaxBrickCoordinates - GetMinBrickCoordinates + FInt3::Scalar(1);
+	const FInt3 GetMinRegionCoordinates = BrickToRegionCoordinates(GetMinBrickCoordinates);
+	const FInt3 GetMaxRegionCoordinates = BrickToRegionCoordinates(GetMaxBrickCoordinates);
+	for(int32 RegionY = GetMinRegionCoordinates.Y;RegionY <= GetMaxRegionCoordinates.Y;++RegionY)
 	{
-		for(int32 RegionX = MinRegionCoordinates.X;RegionX <= MaxRegionCoordinates.X;++RegionX)
+		for(int32 RegionX = GetMinRegionCoordinates.X;RegionX <= GetMaxRegionCoordinates.X;++RegionX)
 		{
-			for(int32 RegionZ = MinRegionCoordinates.Z;RegionZ <= MaxRegionCoordinates.Z;++RegionZ)
+			for(int32 RegionZ = GetMinRegionCoordinates.Z;RegionZ <= GetMaxRegionCoordinates.Z;++RegionZ)
 			{
 				const FInt3 RegionCoordinates(RegionX,RegionY,RegionZ);
 				const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
 				const FInt3 MinRegionBrickCoordinates = FInt3(RegionX,RegionY,RegionZ) * BricksPerRegion;
-				const FInt3 MinOutputRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),MinBrickCoordinates - MinRegionBrickCoordinates);
-				const FInt3 MaxOutputRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),MaxBrickCoordinates - MinRegionBrickCoordinates);
+				const FInt3 MinOutputRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),GetMinBrickCoordinates - MinRegionBrickCoordinates);
+				const FInt3 MaxOutputRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),GetMaxBrickCoordinates - MinRegionBrickCoordinates);
 				for(int32 RegionBrickY = MinOutputRegionBrickCoordinates.Y;RegionBrickY <= MaxOutputRegionBrickCoordinates.Y;++RegionBrickY)
 				{
 					for(int32 RegionBrickX = MinOutputRegionBrickCoordinates.X;RegionBrickX <= MaxOutputRegionBrickCoordinates.X;++RegionBrickX)
 					{
-						const int32 OutputX = MinRegionBrickCoordinates.X + RegionBrickX - MinBrickCoordinates.X;
-						const int32 OutputY = MinRegionBrickCoordinates.Y + RegionBrickY - MinBrickCoordinates.Y;
-						const int32 OutputMinZ = MinRegionBrickCoordinates.Z + MinOutputRegionBrickCoordinates.Z - MinBrickCoordinates.Z;
+						const int32 OutputX = MinRegionBrickCoordinates.X + RegionBrickX - GetMinBrickCoordinates.X;
+						const int32 OutputY = MinRegionBrickCoordinates.Y + RegionBrickY - GetMinBrickCoordinates.Y;
+						const int32 OutputMinZ = MinRegionBrickCoordinates.Z + MinOutputRegionBrickCoordinates.Z - GetMinBrickCoordinates.Z;
 						const int32 OutputSizeZ = MaxOutputRegionBrickCoordinates.Z - MinOutputRegionBrickCoordinates.Z + 1;
 						const uint32 OutputBaseBrickIndex = (OutputY * OutputSize.X + OutputX) * OutputSize.Z + OutputMinZ;
 						const uint32 RegionBaseBrickIndex = (((RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX) << Parameters.BricksPerRegionLog2.Z) + MinOutputRegionBrickCoordinates.Z;
@@ -136,29 +136,29 @@ void UBrickGridComponent::GetBrickMaterialArray(const FInt3& MinBrickCoordinates
 	}
 }
 
-void UBrickGridComponent::SetBrickMaterialArray(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,const TArray<uint8>& BrickMaterials)
+void UBrickGridComponent::SetBrickMaterialArray(const FInt3& SetMinBrickCoordinates,const FInt3& SetMaxBrickCoordinates,const TArray<uint8>& BrickMaterials)
 {
-	const FInt3 InputSize = MaxBrickCoordinates - MinBrickCoordinates + FInt3::Scalar(1);
-	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
-	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(MaxBrickCoordinates);
-	for(int32 RegionY = MinRegionCoordinates.Y;RegionY <= MaxRegionCoordinates.Y;++RegionY)
+	const FInt3 InputSize = SetMaxBrickCoordinates - SetMinBrickCoordinates + FInt3::Scalar(1);
+	const FInt3 SetMinRegionCoordinates = BrickToRegionCoordinates(SetMinBrickCoordinates);
+	const FInt3 SetMaxRegionCoordinates = BrickToRegionCoordinates(SetMaxBrickCoordinates);
+	for(int32 RegionY = SetMinRegionCoordinates.Y;RegionY <= SetMaxRegionCoordinates.Y;++RegionY)
 	{
-		for(int32 RegionX = MinRegionCoordinates.X;RegionX <= MaxRegionCoordinates.X;++RegionX)
+		for(int32 RegionX = SetMinRegionCoordinates.X;RegionX <= SetMaxRegionCoordinates.X;++RegionX)
 		{
-			for(int32 RegionZ = MinRegionCoordinates.Z;RegionZ <= MaxRegionCoordinates.Z;++RegionZ)
+			for(int32 RegionZ = SetMinRegionCoordinates.Z;RegionZ <= SetMaxRegionCoordinates.Z;++RegionZ)
 			{
 				const FInt3 RegionCoordinates(RegionX,RegionY,RegionZ);
 				const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
 				const FInt3 MinRegionBrickCoordinates = FInt3(RegionX,RegionY,RegionZ) * BricksPerRegion;
-				const FInt3 MinInputRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),MinBrickCoordinates - MinRegionBrickCoordinates);
-				const FInt3 MaxInputRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),MaxBrickCoordinates - MinRegionBrickCoordinates);
+				const FInt3 MinInputRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),SetMinBrickCoordinates - MinRegionBrickCoordinates);
+				const FInt3 MaxInputRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),SetMaxBrickCoordinates - MinRegionBrickCoordinates);
 				for(int32 RegionBrickY = MinInputRegionBrickCoordinates.Y;RegionBrickY <= MaxInputRegionBrickCoordinates.Y;++RegionBrickY)
 				{
 					for(int32 RegionBrickX = MinInputRegionBrickCoordinates.X;RegionBrickX <= MaxInputRegionBrickCoordinates.X;++RegionBrickX)
 					{
-						const int32 InputX = MinRegionBrickCoordinates.X + RegionBrickX - MinBrickCoordinates.X;
-						const int32 InputY = MinRegionBrickCoordinates.Y + RegionBrickY - MinBrickCoordinates.Y;
-						const int32 InputMinZ = MinRegionBrickCoordinates.Z + MinInputRegionBrickCoordinates.Z - MinBrickCoordinates.Z;
+						const int32 InputX = MinRegionBrickCoordinates.X + RegionBrickX - SetMinBrickCoordinates.X;
+						const int32 InputY = MinRegionBrickCoordinates.Y + RegionBrickY - SetMinBrickCoordinates.Y;
+						const int32 InputMinZ = MinRegionBrickCoordinates.Z + MinInputRegionBrickCoordinates.Z - SetMinBrickCoordinates.Z;
 						const int32 InputSizeZ = MaxInputRegionBrickCoordinates.Z - MinInputRegionBrickCoordinates.Z + 1;
 						const uint32 InputBaseBrickIndex = (InputY * InputSize.X + InputX) * InputSize.Z + InputMinZ;
 						const uint32 RegionBaseBrickIndex = (((RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX) << Parameters.BricksPerRegionLog2.Z) + MinInputRegionBrickCoordinates.Z;
@@ -172,7 +172,7 @@ void UBrickGridComponent::SetBrickMaterialArray(const FInt3& MinBrickCoordinates
 		}
 	}
 
-	InvalidateChunkComponents(MinBrickCoordinates,MaxBrickCoordinates);
+	InvalidateChunkComponents(SetMinBrickCoordinates,SetMaxBrickCoordinates);
 }
 
 bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 MaterialIndex)
@@ -220,11 +220,11 @@ void UBrickGridComponent::UpdateMaxNonEmptyBrickMap(FBrickRegion& Region,const F
 	}
 }
 
-void UBrickGridComponent::GetMaxNonEmptyBrickZ(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates,TArray<int8>& OutHeightMap) const
+void UBrickGridComponent::GetMaxNonEmptyBrickZ(const FInt3& GetMinBrickCoordinates,const FInt3& GetMaxBrickCoordinates,TArray<int8>& OutHeightMap) const
 {
-	const FInt3 OutputSize = MaxBrickCoordinates - MinBrickCoordinates + FInt3::Scalar(1);
-	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
-	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(MaxBrickCoordinates);
+	const FInt3 OutputSize = GetMaxBrickCoordinates - GetMinBrickCoordinates + FInt3::Scalar(1);
+	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(GetMinBrickCoordinates);
+	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(GetMaxBrickCoordinates);
 	const FInt3 TopMaxRegionCoordinates = FInt3(MaxRegionCoordinates.X,MaxRegionCoordinates.Y,Parameters.MaxRegionCoordinates.Z);
 	for(int32 RegionY = MinRegionCoordinates.Y;RegionY <= TopMaxRegionCoordinates.Y;++RegionY)
 	{
@@ -242,13 +242,13 @@ void UBrickGridComponent::GetMaxNonEmptyBrickZ(const FInt3& MinBrickCoordinates,
 				}
 			}
 			const FInt3 MinRegionBrickCoordinates = FInt3(RegionX,RegionY,MinRegionCoordinates.Z) * BricksPerRegion;
-			const FInt3 MinOutputRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),MinBrickCoordinates - MinRegionBrickCoordinates);
-			const FInt3 MaxOutputRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),MaxBrickCoordinates - MinRegionBrickCoordinates);
+			const FInt3 MinOutputRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),GetMinBrickCoordinates - MinRegionBrickCoordinates);
+			const FInt3 MaxOutputRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),GetMaxBrickCoordinates - MinRegionBrickCoordinates);
 			for(int32 RegionBrickY = MinOutputRegionBrickCoordinates.Y;RegionBrickY <= MaxOutputRegionBrickCoordinates.Y;++RegionBrickY)
 			{
 				for(int32 RegionBrickX = MinOutputRegionBrickCoordinates.X;RegionBrickX <= MaxOutputRegionBrickCoordinates.X;++RegionBrickX)
 				{
-					int32 MaxNonEmptyBrickZ = UBrickGridComponent::MinBrickCoordinates.Z - 1;
+					int32 MaxNonEmptyBrickZ = MinBrickCoordinates.Z - 1;
 					for(int32 RegionZIndex = ZRegions.Num() - 1;RegionZIndex >= 0;--RegionZIndex)
 					{
 						const FBrickRegion& Region = *ZRegions[RegionZIndex];
@@ -260,23 +260,23 @@ void UBrickGridComponent::GetMaxNonEmptyBrickZ(const FInt3& MinBrickCoordinates,
 						}
 					}
 
-					const int32 OutputX = MinRegionBrickCoordinates.X + RegionBrickX - MinBrickCoordinates.X;
-					const int32 OutputY = MinRegionBrickCoordinates.Y + RegionBrickY - MinBrickCoordinates.Y;
-					OutHeightMap[OutputY * OutputSize.X + OutputX] = (int8)FMath::Clamp(MaxNonEmptyBrickZ - MinBrickCoordinates.Z,-1,127);
+					const int32 OutputX = MinRegionBrickCoordinates.X + RegionBrickX - GetMinBrickCoordinates.X;
+					const int32 OutputY = MinRegionBrickCoordinates.Y + RegionBrickY - GetMinBrickCoordinates.Y;
+					OutHeightMap[OutputY * OutputSize.X + OutputX] = (int8)FMath::Clamp(MaxNonEmptyBrickZ - GetMinBrickCoordinates.Z,-1,127);
 				}
 			}
 		}
 	}
 }
 
-void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinBrickCoordinates,const FInt3& MaxBrickCoordinates)
+void UBrickGridComponent::InvalidateChunkComponents(const FInt3& GetMinBrickCoordinates,const FInt3& GetMaxBrickCoordinates)
 {
 	// Expand the brick box by 1 brick so that bricks facing the one being invalidated are also updated.
 	const FInt3 FacingExpansionExtent = FInt3::Scalar(1);
 
 	// Update the region non-empty brick max Z maps.
-	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(MinBrickCoordinates);
-	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(MaxBrickCoordinates);
+	const FInt3 MinRegionCoordinates = BrickToRegionCoordinates(GetMinBrickCoordinates);
+	const FInt3 MaxRegionCoordinates = BrickToRegionCoordinates(GetMaxBrickCoordinates);
 	for(int32 RegionZ = Parameters.MinRegionCoordinates.Z;RegionZ <= MaxRegionCoordinates.Z;++RegionZ)
 	{
 		for(int32 RegionY = MinRegionCoordinates.Y;RegionY <= MaxRegionCoordinates.Y;++RegionY)
@@ -288,8 +288,8 @@ void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinBrickCoordin
 				if(RegionIndex)
 				{
 					const FInt3 MinRegionBrickCoordinates = RegionCoordinates * BricksPerRegion;
-					const FInt3 MinDirtyRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),MinBrickCoordinates - MinRegionBrickCoordinates);
-					const FInt3 MaxDirtyRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),MaxBrickCoordinates - MinRegionBrickCoordinates);
+					const FInt3 MinDirtyRegionBrickCoordinates = FInt3::Max(FInt3::Scalar(0),GetMinBrickCoordinates - MinRegionBrickCoordinates);
+					const FInt3 MaxDirtyRegionBrickCoordinates = FInt3::Min(BricksPerRegion - FInt3::Scalar(1),GetMaxBrickCoordinates - MinRegionBrickCoordinates);
 					UpdateMaxNonEmptyBrickMap(Regions[*RegionIndex],MinDirtyRegionBrickCoordinates,MaxDirtyRegionBrickCoordinates);
 				}
 			}
@@ -299,13 +299,13 @@ void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinBrickCoordin
 	// Invalidate render components. Note that because of ambient occlusion, the render chunks need to be invalidated all the way to the bottom of the grid!
 	const FInt3 AmbientOcclusionExpansionExtent = FInt3::Scalar(Parameters.AmbientOcclusionBlurRadius);
 	const FInt3 RenderExpansionExtent = AmbientOcclusionExpansionExtent + FacingExpansionExtent;
-	const FInt3 MinRenderChunkCoordinates = BrickToRenderChunkCoordinates(MinBrickCoordinates - RenderExpansionExtent);
-	const FInt3 MaxRenderChunkCoordinates = BrickToRenderChunkCoordinates(MaxBrickCoordinates + RenderExpansionExtent);
+	const FInt3 MinRenderChunkCoordinates = BrickToRenderChunkCoordinates(GetMinBrickCoordinates - RenderExpansionExtent);
+	const FInt3 MaxRenderChunkCoordinates = BrickToRenderChunkCoordinates(GetMaxBrickCoordinates + RenderExpansionExtent);
 	for(int32 ChunkX = MinRenderChunkCoordinates.X;ChunkX <= MaxRenderChunkCoordinates.X;++ChunkX)
 	{
 		for(int32 ChunkY = MinRenderChunkCoordinates.Y;ChunkY <= MaxRenderChunkCoordinates.Y;++ChunkY)
 		{
-			for(int32 ChunkZ = UBrickGridComponent::MinBrickCoordinates.Z;ChunkZ <= MaxRenderChunkCoordinates.Z;++ChunkZ)
+			for(int32 ChunkZ = MinBrickCoordinates.Z;ChunkZ <= MaxRenderChunkCoordinates.Z;++ChunkZ)
 			{
 				UBrickRenderComponent* RenderComponent = RenderChunkCoordinatesToComponent.FindRef(FInt3(ChunkX,ChunkY,ChunkZ));
 				if(RenderComponent)
@@ -325,8 +325,8 @@ void UBrickGridComponent::InvalidateChunkComponents(const FInt3& MinBrickCoordin
 	}
 
 	// Invalidate collision components.
-	const FInt3 MinCollisionChunkCoordinates = BrickToCollisionChunkCoordinates(MinBrickCoordinates - FacingExpansionExtent);
-	const FInt3 MaxCollisionChunkCoordinates = BrickToCollisionChunkCoordinates(MaxBrickCoordinates + FacingExpansionExtent);
+	const FInt3 MinCollisionChunkCoordinates = BrickToCollisionChunkCoordinates(GetMinBrickCoordinates - FacingExpansionExtent);
+	const FInt3 MaxCollisionChunkCoordinates = BrickToCollisionChunkCoordinates(GetMaxBrickCoordinates + FacingExpansionExtent);
 	for(int32 ChunkX = MinCollisionChunkCoordinates.X;ChunkX <= MaxCollisionChunkCoordinates.X;++ChunkX)
 	{
 		for(int32 ChunkY = MinCollisionChunkCoordinates.Y;ChunkY <= MaxCollisionChunkCoordinates.Y;++ChunkY)
@@ -367,8 +367,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 				const FBox RegionBounds((RegionCoordinates * BricksPerRegion).ToFloat(),((RegionCoordinates + FInt3::Scalar(1)) * BricksPerRegion).ToFloat());
 				if(RegionBounds.ComputeSquaredDistanceToPoint(LocalViewPosition) < FMath::Square(LocalMaxDrawAndCollisionDistance + RegionExpansionRadius))
 				{
-					const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
-					if(!RegionIndex)
+					if(!RegionCoordinatesToIndex.Find(RegionCoordinates))
 					{
 						const int32 RegionIndex = Regions.Num();
 						FBrickRegion& Region = *new(Regions) FBrickRegion;
@@ -405,7 +404,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 			);
 		if(ChunkBounds.ComputeSquaredDistanceToPoint(LocalViewPosition) > FMath::Square(LocalMaxDrawDistance))
 		{
-			ChunkIt.Value()->DetachFromParent();
+			ChunkIt.Value()->DetachFromComponent(FDetachmentTransformRules(EDetachmentRule::KeepRelative,false));
 			ChunkIt.Value()->DestroyComponent();
 			ChunkIt.RemoveCurrent();
 		}
@@ -435,7 +434,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 
 						// Set the component transform and register it.
 						RenderComponent->SetRelativeLocation((ChunkCoordinates * BricksPerRenderChunk).ToFloat());
-						RenderComponent->AttachTo(this);
+						RenderComponent->AttachToComponent(this,FAttachmentTransformRules(EAttachmentRule::KeepRelative,false));
 						RenderComponent->RegisterComponent();
 
 						// Add the chunk to the coordinate map and visible chunk array.
@@ -464,7 +463,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 		||	FInt3::Any(ChunkIt.Key() > MaxCollisionChunkCoordinates)
 		||	ChunkBounds.ComputeSquaredDistanceToPoint(LocalViewPosition) > FMath::Square(LocalMaxCollisionDistance))
 		{
-			ChunkIt.Value()->DetachFromParent();
+			ChunkIt.Value()->DetachFromComponent(FDetachmentTransformRules(EDetachmentRule::KeepRelative,false));
 			ChunkIt.Value()->DestroyComponent();
 			ChunkIt.RemoveCurrent();
 		}
@@ -488,7 +487,7 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 
 						// Set the component transform and register it.
 						Chunk->SetRelativeLocation((ChunkCoordinates * BricksPerCollisionChunk).ToFloat());
-						Chunk->AttachTo(this);
+						Chunk->AttachToComponent(this,FAttachmentTransformRules(EAttachmentRule::KeepRelative,false));
 						Chunk->RegisterComponent();
 
 						// Add the chunk to the coordinate map and visible chunk array.
