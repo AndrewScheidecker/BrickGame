@@ -6,6 +6,8 @@ public class BrickGame : ModuleRules
 {
 	public BrickGame(TargetInfo Target)
 	{
+		MinFilesUsingPrecompiledHeaderOverride = 1;
+        	bFasterWithoutUnity = true;
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
 	}
 }
