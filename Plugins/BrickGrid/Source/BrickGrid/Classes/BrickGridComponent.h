@@ -155,12 +155,16 @@ struct FBrickRegion
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category=Region)
 	FInt3 Coordinates;
 
+
 	// Contains the material index for each brick, stored in an 8-bit integer.
 	UPROPERTY()
 	TArray<uint8> BrickContents;
 
 	// Contains the occupied brick with highest Z in this region for each XY coordinate in the region. -1 means no non-empty bricks in this region at that XY.
 	TArray<int8> MaxNonEmptyBrickRegionZs;
+
+	//Contains the coordinates of the complex bricks in the region, and their MaterialIndexes
+	TMap<FInt3, uint8> RegionComplexBrickIndexes;
 };
 
 /** The parameters for a BrickGridComponent. */
@@ -168,14 +172,22 @@ USTRUCT(BlueprintType)
 struct FBrickGridParameters
 {
 	GENERATED_USTRUCT_BODY()
-
+		
 	// The materials to render for each brick material.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Materials)
 	TArray<FBrickMaterial> Materials;
 
+	// The materials to render for each brick material.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Materials)
+	TArray<UStaticMesh*> ComplexMeshes;
+
 	// The material index that means "empty".
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Materials)
 	int32 EmptyMaterialIndex;
+
+	// Separates the normal from the complex bricks
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Materials)
+	int32 firstComplexBrickIndex;
 
 	// The number of bricks along each axis of a region is 2^BricksPerChunkLog2
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Chunks)
@@ -262,6 +274,10 @@ public:
 	UFUNCTION(BlueprintCallable,Category = "Brick Grid")
 	void Update(const FVector& WorldViewPosition,float MaxDrawDistance,float MaxCollisionDistance,float MaxDesiredUpdateTime,FBrickGrid_InitRegion InitRegion);
 
+	// Updates the visible chunks for a given view position.
+	UFUNCTION(BlueprintCallable, Category = "Brick Grid")
+	void RenderRegionComplexBricks(const FInt3 RegionCoordinates);
+	
 	// The parameters for the grid.
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Brick Grid")
 	FBrickGridParameters Parameters;
@@ -297,7 +313,18 @@ public:
 	}
 	inline FInt3 BrickToRegionCoordinates(const FInt3& BrickCoordinates) const
 	{
-		return FInt3::SignedShiftRight(BrickCoordinates,Parameters.BricksPerRegionLog2);
+		return FInt3::SignedShiftRight(BrickCoordinates, Parameters.BricksPerRegionLog2);
+	}
+	inline bool IsBrickComplexByMaterialIndex(const int32& MaterialIndex) const
+	{
+		//TODO check if it is possible to use Parameters.Materials.Num();
+		//return MaterialIndex >= Parameters.firstComplexBrickIndex;
+		return MaterialIndex == 1;
+	}
+	inline int32 GetComplexBrickShapeIndex(const int32& MaterialIndex) const
+	{
+		//TODO check if it is possible to use Parameters.Materials.Num();
+		return FMath::Max(0, MaterialIndex - Parameters.firstComplexBrickIndex);
 	}
 
 	// USceneComponent interface.
@@ -316,6 +343,11 @@ private:
 	TMap<FInt3,int32> RegionCoordinatesToIndex;
 	TMap<FInt3,class UBrickRenderComponent*> RenderChunkCoordinatesToComponent;
 	TMap<FInt3,class UBrickCollisionComponent*> CollisionChunkCoordinatesToComponent;
+
+	// Transient map to help organize the Complex Bricks Instances by Region Coordinate and Shape Index.
+	TMap<FInt3, TMap<int32, class UInstancedStaticMeshComponent*>> ComplexRenderChunkCoordinatesToComponent;
+	// Transient map to help lookup the Complex Bricks Instances Shapes and Intance Indexes by having RenderChunkCoordinate and ShapeIndex.
+	TMap<FInt3, TMap<FInt3, TTuple<int32, int32>>> MapOfBricksCoordinatesToShapeAndInstanceIndexes;
 
 	// Initializes the derived constants from the properties they are derived from.
 	void ComputeDerivedConstants();
@@ -336,7 +368,17 @@ private:
 		return SubregionBrickCoordinatesToRegionBrickIndex(BrickCoordinates - (RegionCoordinates << Parameters.BricksPerRegionLog2));
 		
 	}
+	inline FInt3 LocalBrickCoordinatesToBrickCoordinates(const FInt3& BrickCoordinates, const FInt3& RegionCoordinates) const
+	{
+		return FInt3(BrickCoordinates + RegionCoordinates * BricksPerRegion);
+	}
 
 	// Updates the non-empty height map for a single region.
 	void UpdateMaxNonEmptyBrickMap(FBrickRegion& Region,const FInt3 MinDirtyBrickCoordinates,const FInt3 MaxDirtyBrickCoordinates) const;
+
+	//Renders a static mesh instance on a Brick coordinate
+	void RenderComplexBrick(const FInt3 RegionCoordinates, const FInt3 Coordinates, const int32 ShapeIndex);
+	//Adds a ComplexRenderComponent to a specific RenderChunk
+	void AddComplexRenderComponent(const FInt3 RenderChunkCoordinates, const int32 ShapeIndex);
+
 };
