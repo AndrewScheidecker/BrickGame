@@ -472,7 +472,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 					{
 						// Only draw faces of bricks that aren't empty.
 						const uint32 LocalBrickIndex = (LocalBrickY * LocalBricksDim.X + LocalBrickX) * LocalBricksDim.Z + LocalBrickZ;
-						uint8 BrickMaterial = LocalBrickMaterials[LocalBrickIndex];
+						const uint8 BrickMaterial = (LocalBrickMaterials[LocalBrickIndex] < (uint32)BrickClassByMaterial.Num()) ? LocalBrickMaterials[LocalBrickIndex] : 0;
 						if (BrickMaterial != EmptyMaterialIndex)
 						{
 							const FInt3 RelativeBrickCoordinates = FInt3(LocalBrickX,LocalBrickY,LocalBrickZ) - LocalBrickExpansion;
@@ -483,10 +483,8 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 								const int32 FacingLocalBrickY = LocalBrickY + FaceNormals[FaceIndex].Y;
 								const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
 								const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
-								uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
+								const uint32 FrontBrickMaterial = (LocalBrickMaterials[FacingLocalBrickIndex] < (uint32)BrickClassByMaterial.Num()) ? LocalBrickMaterials[FacingLocalBrickIndex] : 0;
 
-								if (BrickMaterial >(uint32)BrickClassByMaterial.Num()) BrickMaterial = 0;
-								if (FrontBrickMaterial >  (uint32)BrickClassByMaterial.Num()) FrontBrickMaterial = 0;
 								if (BrickClassByMaterial[BrickMaterial] > BrickClassByMaterial[FrontBrickMaterial])
 								{
 									uint16 FaceVertexIndices[4];
