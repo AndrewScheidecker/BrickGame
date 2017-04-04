@@ -177,7 +177,7 @@ void UBrickGridComponent::SetBrickMaterialArray(const FInt3& SetMinBrickCoordina
 
 bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 MaterialIndex)
 {
-	if(FInt3::All(BrickCoordinates >= MinBrickCoordinates) && FInt3::All(BrickCoordinates <= MaxBrickCoordinates) && MaterialIndex < Parameters.Materials.Num())
+	if(FInt3::All(BrickCoordinates >= MinBrickCoordinates) && FInt3::All(BrickCoordinates <= MaxBrickCoordinates))
 	{
 		const FInt3 RegionCoordinates = BrickToRegionCoordinates(BrickCoordinates);
 		const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
@@ -185,22 +185,22 @@ bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 Material
 		{
 			const uint32 BrickIndex = BrickCoordinatesToRegionBrickIndex(RegionCoordinates,BrickCoordinates);
 			FBrickRegion& Region = Regions[*RegionIndex];
+
+			UE_LOG(LogStats, Log, TEXT("Material Index is %d"), MaterialIndex);
 			if (IsBrickComplexByMaterialIndex(MaterialIndex))
 			{
 				int32 ShapeIndex = GetComplexBrickShapeIndex(MaterialIndex);
 				Region.RegionComplexBrickIndexes.Add(BrickCoordinates, 0);
+
+				UE_LOG(LogStats, Log, TEXT("Rendering complex brick"));
 				RenderComplexBrick(RegionCoordinates, BrickCoordinates, 0);
 			}
-			else
+			else if (MaterialIndex == Parameters.EmptyMaterialIndex && IsBrickComplexByMaterialIndex(Region.BrickContents[BrickIndex]))
 			{
-
-				Region.BrickContents[BrickIndex] = MaterialIndex;
-				InvalidateChunkComponents(BrickCoordinates, BrickCoordinates);
-				if (MaterialIndex == Parameters.EmptyMaterialIndex && IsBrickComplexByMaterialIndex(Region.BrickContents[BrickIndex]))
-				{
-					//delete complex brick
-				}
+				//delete complex brick				
 			}
+			Region.BrickContents[BrickIndex] = MaterialIndex;
+			InvalidateChunkComponents(BrickCoordinates, BrickCoordinates);
 			return true;
 		}
 	}
@@ -266,7 +266,7 @@ void UBrickGridComponent::AddComplexRenderComponent(const FInt3 RenderChunkCoord
 	ComplexRenderChunkCoordinatesToComponent[RenderChunkCoordinates].Add(ShapeIndex);
 
 	ComplexRenderComponent = NewObject<UInstancedStaticMeshComponent>(GetOwner());
-	ComplexRenderComponent->AttachTo(this);
+	ComplexRenderComponent->AttachToComponent(this, FAttachmentTransformRules(EAttachmentRule::KeepRelative, false));
 	ComplexRenderComponent->RegisterComponent();
 	ComplexRenderComponent->SetStaticMesh(Parameters.ComplexMeshes[ShapeIndex]);
 	ComplexRenderChunkCoordinatesToComponent[RenderChunkCoordinates][ShapeIndex] = ComplexRenderComponent;

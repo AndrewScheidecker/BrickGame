@@ -317,14 +317,11 @@ public:
 	}
 	inline bool IsBrickComplexByMaterialIndex(const int32& MaterialIndex) const
 	{
-		//TODO check if it is possible to use Parameters.Materials.Num();
-		//return MaterialIndex >= Parameters.firstComplexBrickIndex;
-		return MaterialIndex == 1;
+		return  MaterialIndex > Parameters.Materials.Num();
 	}
 	inline int32 GetComplexBrickShapeIndex(const int32& MaterialIndex) const
 	{
-		//TODO check if it is possible to use Parameters.Materials.Num();
-		return FMath::Max(0, MaterialIndex - Parameters.firstComplexBrickIndex);
+		return MaterialIndex - Parameters.Materials.Num();
 	}
 
 	// USceneComponent interface.

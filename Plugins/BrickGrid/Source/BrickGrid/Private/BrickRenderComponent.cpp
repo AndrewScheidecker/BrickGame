@@ -429,7 +429,15 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 							const FInt3 LocalBrickCoordinates = LocalVertexCoordinates + GetCornerVertexOffset(AdjacentBrickIndex) + LocalBrickExpansion - FInt3::Scalar(1);
 							const uint32 LocalBrickIndex = (LocalBrickCoordinates.Y * LocalBricksDim.X + LocalBrickCoordinates.X) * LocalBricksDim.Z + LocalBrickCoordinates.Z;
 							
-							const uint32 BrickClass = (uint32)BrickClassByMaterial[LocalBrickMaterials[LocalBrickIndex]];
+							uint32 BrickClass;
+							if (LocalBrickMaterials[LocalBrickIndex] < BrickClassByMaterial.Num())
+							{
+								BrickClass = (uint32)BrickClassByMaterial[LocalBrickMaterials[LocalBrickIndex]];
+							}
+							else
+							{
+								BrickClass = (uint32)BrickClassByMaterial[0];
+							}
 							HasAdjacentBrickOfClass[BrickClass] = 1;
 						}
 
@@ -464,7 +472,7 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 					{
 						// Only draw faces of bricks that aren't empty.
 						const uint32 LocalBrickIndex = (LocalBrickY * LocalBricksDim.X + LocalBrickX) * LocalBricksDim.Z + LocalBrickZ;
-						const uint8 BrickMaterial = LocalBrickMaterials[LocalBrickIndex];
+						uint8 BrickMaterial = LocalBrickMaterials[LocalBrickIndex];
 						if (BrickMaterial != EmptyMaterialIndex)
 						{
 							const FInt3 RelativeBrickCoordinates = FInt3(LocalBrickX,LocalBrickY,LocalBrickZ) - LocalBrickExpansion;
@@ -475,8 +483,10 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 								const int32 FacingLocalBrickY = LocalBrickY + FaceNormals[FaceIndex].Y;
 								const int32 FacingLocalBrickZ = LocalBrickZ + FaceNormals[FaceIndex].Z;
 								const uint32 FacingLocalBrickIndex = (FacingLocalBrickY * LocalBricksDim.X + FacingLocalBrickX) * LocalBricksDim.Z + FacingLocalBrickZ;
-								const uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
+								uint32 FrontBrickMaterial = LocalBrickMaterials[FacingLocalBrickIndex];
 
+								if (BrickMaterial >(uint32)BrickClassByMaterial.Num()) BrickMaterial = 0;
+								if (FrontBrickMaterial >  (uint32)BrickClassByMaterial.Num()) FrontBrickMaterial = 0;
 								if (BrickClassByMaterial[BrickMaterial] > BrickClassByMaterial[FrontBrickMaterial])
 								{
 									uint16 FaceVertexIndices[4];
