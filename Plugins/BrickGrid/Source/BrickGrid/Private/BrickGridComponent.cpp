@@ -186,18 +186,18 @@ bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 Material
 			const uint32 BrickIndex = BrickCoordinatesToRegionBrickIndex(RegionCoordinates,BrickCoordinates);
 			FBrickRegion& Region = Regions[*RegionIndex];
 
-			UE_LOG(LogStats, Log, TEXT("Material Index is %d"), MaterialIndex);
 			if (IsBrickComplexByMaterialIndex(MaterialIndex))
 			{
 				int32 ShapeIndex = GetComplexBrickShapeIndex(MaterialIndex);
 				Region.RegionComplexBrickIndexes.Add(BrickCoordinates, 0);
 
-				UE_LOG(LogStats, Log, TEXT("Rendering complex brick"));
 				RenderComplexBrick(RegionCoordinates, BrickCoordinates, 0);
 			}
 			else if (MaterialIndex == Parameters.EmptyMaterialIndex && IsBrickComplexByMaterialIndex(Region.BrickContents[BrickIndex]))
 			{
-				//delete complex brick				
+				//delete complex brick		
+				UE_LOG(LogStats, Log, TEXT("deleteting complex brick"));
+				DeleteComplexBrick(RegionCoordinates, BrickCoordinates);
 			}
 			Region.BrickContents[BrickIndex] = MaterialIndex;
 			InvalidateChunkComponents(BrickCoordinates, BrickCoordinates);
@@ -230,6 +230,32 @@ void UBrickGridComponent::UpdateMaxNonEmptyBrickMap(FBrickRegion& Region,const F
 				}
 			}
 			Region.MaxNonEmptyBrickRegionZs[(RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX] = (int8)MaxNonEmptyRegionBrickZ;
+		}
+	}
+}
+
+void UBrickGridComponent::DeleteComplexBrick(const FInt3 RegionCoordinates, const FInt3 Coordinates)
+{
+	const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
+	if (RegionIndex)
+	{
+		FInt3 RenderChunkCoordinates = BrickToRenderChunkCoordinates(LocalBrickCoordinatesToBrickCoordinates(Coordinates, RegionCoordinates));
+		if (ComplexRenderChunkCoordinatesToComponent.Contains(RenderChunkCoordinates))
+		{
+			if (MapOfBricksCoordinatesToShapeAndInstanceIndexes[RenderChunkCoordinates].Contains(Coordinates))
+			{
+				int32 ShapeIndex = MapOfBricksCoordinatesToShapeAndInstanceIndexes[RenderChunkCoordinates][Coordinates].Get<0>();
+				int32 InstanceIndex = MapOfBricksCoordinatesToShapeAndInstanceIndexes[RenderChunkCoordinates][Coordinates].Get<1>();
+
+				ComplexRenderChunkCoordinatesToComponent[RenderChunkCoordinates][ShapeIndex]->RemoveInstance(InstanceIndex);
+				for (auto& Elem : MapOfBricksCoordinatesToShapeAndInstanceIndexes[RenderChunkCoordinates])
+				{
+					if (Elem.Value.Get<1>() > InstanceIndex)
+					{
+						Elem.Value = TTuple<int32, int32>(Elem.Value.Get<0>(), Elem.Value.Get<1>() - 1);
+					}
+				}
+			}
 		}
 	}
 }

@@ -373,6 +373,8 @@ private:
 	// Updates the non-empty height map for a single region.
 	void UpdateMaxNonEmptyBrickMap(FBrickRegion& Region,const FInt3 MinDirtyBrickCoordinates,const FInt3 MaxDirtyBrickCoordinates) const;
 
+	//Deletes a static mesh instance on a Brick coordinate
+	void DeleteComplexBrick(const FInt3 RegionCoordinates, const FInt3 Coordinates);
 	//Renders a static mesh instance on a Brick coordinate
 	void RenderComplexBrick(const FInt3 RegionCoordinates, const FInt3 Coordinates, const int32 ShapeIndex);
 	//Adds a ComplexRenderComponent to a specific RenderChunk
