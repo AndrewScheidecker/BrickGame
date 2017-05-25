@@ -4,8 +4,8 @@ namespace UnrealBuildTool.Rules
 {
 	public class ConsoleAPI : ModuleRules
 	{
-		public ConsoleAPI(TargetInfo Target)
-		{
+		public ConsoleAPI(ReadOnlyTargetRules Target) : base(Target)
+        {
 			PrivateIncludePaths.AddRange(new string[] {
 				"Developer/ConsoleAPI/Private"
 				});

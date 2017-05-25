@@ -4,8 +4,8 @@ namespace UnrealBuildTool.Rules
 {
 	public class SimplexNoise : ModuleRules
 	{
-		public SimplexNoise(TargetInfo Target)
-		{
+		public SimplexNoise(ReadOnlyTargetRules Target) : base(Target)
+        {
 			PrivateIncludePaths.AddRange(new string[] {
 				"Developer/SimplexNoise/Private",
 				});

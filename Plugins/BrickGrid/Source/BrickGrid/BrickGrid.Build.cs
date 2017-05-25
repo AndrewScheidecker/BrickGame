@@ -4,8 +4,8 @@ namespace UnrealBuildTool.Rules
 {
 	public class BrickGrid : ModuleRules
 	{
-        public BrickGrid(TargetInfo Target)
-		{
+        public BrickGrid(ReadOnlyTargetRules Target) : base(Target)
+        {
 			PrivateIncludePaths.Add("BrickGrid/Private");
 
 			PublicDependencyModuleNames.AddRange(

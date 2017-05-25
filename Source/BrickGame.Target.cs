@@ -5,21 +5,9 @@ using System.Collections.Generic;
 
 public class BrickGameTarget : TargetRules
 {
-	public BrickGameTarget(TargetInfo Target)
-	{
+	public BrickGameTarget(TargetInfo Target) : base(Target)
+    {
 		Type = TargetType.Game;
-	}
-
-	//
-	// TargetRules interface.
-	//
-
-	public override void SetupBinaries(
-		TargetInfo Target,
-		ref List<UEBuildBinaryConfiguration> OutBuildBinaryConfigurations,
-		ref List<string> OutExtraModuleNames
-		)
-	{
-		OutExtraModuleNames.Add("BrickGame");
+        ExtraModuleNames.Add("BrickGame");
 	}
 }

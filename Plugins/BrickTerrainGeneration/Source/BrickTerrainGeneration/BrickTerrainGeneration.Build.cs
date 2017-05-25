@@ -4,8 +4,8 @@ namespace UnrealBuildTool.Rules
 {
 	public class BrickTerrainGeneration : ModuleRules
 	{
-		public BrickTerrainGeneration(TargetInfo Target)
-		{
+		public BrickTerrainGeneration(ReadOnlyTargetRules Target) : base(Target)
+        {
 			PrivateIncludePaths.Add("BrickTerrainGeneration/Private");
 
 			PublicDependencyModuleNames.AddRange(
