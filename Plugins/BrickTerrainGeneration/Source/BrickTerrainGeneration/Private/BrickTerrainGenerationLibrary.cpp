@@ -120,7 +120,7 @@ void UBrickTerrainGenerationLibrary::InitRegion(const FBrickTerrainGenerationPar
 					const int32 BrickRockHeight = FMath::CeilToInt(RockHeight);
 					const int32 BrickGroundHeight = FMath::Min(MaxRegionBrickCoordinates.Z,FPlatformMath::CeilToInt(GroundHeight));
 
-					float CavernProbabilitySamples[BrickGridConstants::MaxBricksPerRegionAxis];
+					float CavernProbabilitySamples[BrickGridConstants::MaxBricksPerRegionAxis+1];
 					const uint32 NumCavernProbabilitySamples = FMath::Min(BrickGridConstants::MaxBricksPerRegionAxis >> 2,(BrickGroundHeight + 3) >> 2);
 					CavernProbabilitySamples[0] = LocalCavernProbabilityFunction.Sample3D(BiasedSeed * 73 + X,Y,MinRegionBrickCoordinates.Z);
 					for(uint32 CavernSampleIndex = 0;CavernSampleIndex < NumCavernProbabilitySamples;++CavernSampleIndex)
