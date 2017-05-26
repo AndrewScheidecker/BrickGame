@@ -25,22 +25,22 @@ ABrickGameCharacter::ABrickGameCharacter(const class FObjectInitializer& Initial
 //////////////////////////////////////////////////////////////////////////
 // Input
 
-void ABrickGameCharacter::SetupPlayerInputComponent(class UInputComponent* InputComponent)
+void ABrickGameCharacter::SetupPlayerInputComponent(class UInputComponent* NewInputComponent)
 {
 	// set up gameplay key bindings
-	check(InputComponent);
+	check(NewInputComponent);
 
-	InputComponent->BindAxis("MoveForward", this, &ABrickGameCharacter::MoveForward);
-	InputComponent->BindAxis("MoveRight", this, &ABrickGameCharacter::MoveRight);
-	InputComponent->BindAxis("MoveUp", this, &ABrickGameCharacter::MoveUp);
+	NewInputComponent->BindAxis("MoveForward", this, &ABrickGameCharacter::MoveForward);
+	NewInputComponent->BindAxis("MoveRight", this, &ABrickGameCharacter::MoveRight);
+	NewInputComponent->BindAxis("MoveUp", this, &ABrickGameCharacter::MoveUp);
 	
 	// We have 2 versions of the rotation bindings to handle different kinds of devices differently
 	// "turn" handles devices that provide an absolute delta, such as a mouse.
 	// "turnrate" is for devices that we choose to treat as a rate of change, such as an analog joystick
-	InputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
-	InputComponent->BindAxis("TurnRate", this, &ABrickGameCharacter::TurnAtRate);
-	InputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
-	InputComponent->BindAxis("LookUpRate", this, &ABrickGameCharacter::LookUpAtRate);
+	NewInputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
+	NewInputComponent->BindAxis("TurnRate", this, &ABrickGameCharacter::TurnAtRate);
+	NewInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
+	NewInputComponent->BindAxis("LookUpRate", this, &ABrickGameCharacter::LookUpAtRate);
 }
 
 void ABrickGameCharacter::MoveForward(float Value)
