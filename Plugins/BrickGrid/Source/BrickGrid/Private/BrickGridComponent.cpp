@@ -177,7 +177,7 @@ void UBrickGridComponent::SetBrickMaterialArray(const FInt3& SetMinBrickCoordina
 
 bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 MaterialIndex)
 {
-	if(FInt3::All(BrickCoordinates >= MinBrickCoordinates) && FInt3::All(BrickCoordinates <= MaxBrickCoordinates) && MaterialIndex < Parameters.Materials.Num())
+	if(FInt3::All(BrickCoordinates >= MinBrickCoordinates) && FInt3::All(BrickCoordinates <= MaxBrickCoordinates))
 	{
 		const FInt3 RegionCoordinates = BrickToRegionCoordinates(BrickCoordinates);
 		const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
@@ -185,8 +185,22 @@ bool UBrickGridComponent::SetBrick(const FInt3& BrickCoordinates, int32 Material
 		{
 			const uint32 BrickIndex = BrickCoordinatesToRegionBrickIndex(RegionCoordinates,BrickCoordinates);
 			FBrickRegion& Region = Regions[*RegionIndex];
+
+			if (IsBrickComplexByMaterialIndex(MaterialIndex))
+			{
+				int32 ShapeIndex = GetComplexBrickShapeIndex(MaterialIndex);
+				Region.RegionComplexBrickIndexes.Add(BrickCoordinates, 0);
+
+				RenderComplexBrick(RegionCoordinates, BrickCoordinates, 0);
+			}
+			else if (MaterialIndex == Parameters.EmptyMaterialIndex && IsBrickComplexByMaterialIndex(Region.BrickContents[BrickIndex]))
+			{
+				//delete complex brick		
+				UE_LOG(LogStats, Log, TEXT("deleteting complex brick"));
+				DeleteComplexBrick(RegionCoordinates, BrickCoordinates);
+			}
 			Region.BrickContents[BrickIndex] = MaterialIndex;
-			InvalidateChunkComponents(BrickCoordinates,BrickCoordinates);
+			InvalidateChunkComponents(BrickCoordinates, BrickCoordinates);
 			return true;
 		}
 	}
@@ -218,6 +232,70 @@ void UBrickGridComponent::UpdateMaxNonEmptyBrickMap(FBrickRegion& Region,const F
 			Region.MaxNonEmptyBrickRegionZs[(RegionBrickY << Parameters.BricksPerRegionLog2.X) + RegionBrickX] = (int8)MaxNonEmptyRegionBrickZ;
 		}
 	}
+}
+
+void UBrickGridComponent::DeleteComplexBrick(const FInt3 RegionCoordinates, const FInt3 Coordinates)
+{
+	const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
+	if (RegionIndex)
+	{
+		FInt3 RenderChunkCoordinates = BrickToRenderChunkCoordinates(LocalBrickCoordinatesToBrickCoordinates(Coordinates, RegionCoordinates));
+		if (ComplexRenderChunkCoordinatesToComponent.Contains(RenderChunkCoordinates))
+		{
+			if (MapOfBricksCoordinatesToShapeAndInstanceIndexes[RenderChunkCoordinates].Contains(Coordinates))
+			{
+				int32 ShapeIndex = MapOfBricksCoordinatesToShapeAndInstanceIndexes[RenderChunkCoordinates][Coordinates].Get<0>();
+				int32 InstanceIndex = MapOfBricksCoordinatesToShapeAndInstanceIndexes[RenderChunkCoordinates][Coordinates].Get<1>();
+
+				ComplexRenderChunkCoordinatesToComponent[RenderChunkCoordinates][ShapeIndex]->RemoveInstance(InstanceIndex);
+				for (auto& Elem : MapOfBricksCoordinatesToShapeAndInstanceIndexes[RenderChunkCoordinates])
+				{
+					if (Elem.Value.Get<1>() > InstanceIndex)
+					{
+						Elem.Value = TTuple<int32, int32>(Elem.Value.Get<0>(), Elem.Value.Get<1>() - 1);
+					}
+				}
+			}
+		}
+	}
+}
+
+void UBrickGridComponent::RenderComplexBrick(const FInt3 RegionCoordinates, const FInt3 Coordinates, const int32 ShapeIndex)
+{
+	int32 MaterialIndex = 7;
+	UInstancedStaticMeshComponent* ComplexRenderComponent = nullptr;
+	FInt3 RenderChunkCoordinates = BrickToRenderChunkCoordinates(LocalBrickCoordinatesToBrickCoordinates(Coordinates, RegionCoordinates));
+	
+	if (!ComplexRenderChunkCoordinatesToComponent.Contains(RenderChunkCoordinates))
+	{
+		ComplexRenderChunkCoordinatesToComponent.Add(RenderChunkCoordinates);
+		MapOfBricksCoordinatesToShapeAndInstanceIndexes.Add(RenderChunkCoordinates);
+	}
+	if (!ComplexRenderChunkCoordinatesToComponent[RenderChunkCoordinates].Contains(ShapeIndex))
+	{
+		AddComplexRenderComponent(RenderChunkCoordinates, ShapeIndex);
+	}
+	MapOfBricksCoordinatesToShapeAndInstanceIndexes[RenderChunkCoordinates]
+		.Add(Coordinates, TTuple<int32, int32>(ShapeIndex, ComplexRenderChunkCoordinatesToComponent[RenderChunkCoordinates][ShapeIndex]->GetInstanceCount()));
+	ComplexRenderComponent = ComplexRenderChunkCoordinatesToComponent[RenderChunkCoordinates][ShapeIndex];
+
+	ComplexRenderComponent->SetMaterial(0, Parameters.Materials[MaterialIndex].SurfaceMaterial);
+	FTransform Transform;
+	Transform.SetLocation(FVector(Coordinates.X + .5, Coordinates.Y + .5, Coordinates.Z + .5));
+	Transform.SetScale3D(FVector(1, 1, 1));
+	ComplexRenderComponent->AddInstance(Transform);
+}
+
+void UBrickGridComponent::AddComplexRenderComponent(const FInt3 RenderChunkCoordinates, const int32 ShapeIndex)
+{
+	UInstancedStaticMeshComponent* ComplexRenderComponent = nullptr;
+	ComplexRenderChunkCoordinatesToComponent[RenderChunkCoordinates].Add(ShapeIndex);
+
+	ComplexRenderComponent = NewObject<UInstancedStaticMeshComponent>(GetOwner());
+	ComplexRenderComponent->AttachToComponent(this, FAttachmentTransformRules(EAttachmentRule::KeepRelative, false));
+	ComplexRenderComponent->RegisterComponent();
+	ComplexRenderComponent->SetStaticMesh(Parameters.ComplexMeshes[ShapeIndex]);
+	ComplexRenderChunkCoordinatesToComponent[RenderChunkCoordinates][ShapeIndex] = ComplexRenderComponent;
 }
 
 void UBrickGridComponent::GetMaxNonEmptyBrickZ(const FInt3& GetMinBrickCoordinates,const FInt3& GetMaxBrickCoordinates,TArray<int8>& OutHeightMap) const
@@ -499,6 +577,18 @@ void UBrickGridComponent::Update(const FVector& WorldViewPosition,float MaxDrawD
 	}
 }
 
+void UBrickGridComponent::RenderRegionComplexBricks(const FInt3 RegionCoordinates)
+{
+	const int32* const RegionIndex = RegionCoordinatesToIndex.Find(RegionCoordinates);
+	if (RegionIndex)
+	{
+		for (auto& Elem : Regions[*RegionIndex].RegionComplexBrickIndexes)
+		{
+			RenderComplexBrick(RegionCoordinates, Elem.Key, Elem.Value);
+		}
+	}
+}
+
 FBoxSphereBounds UBrickGridComponent::CalcBounds(const FTransform & LocalToWorld) const
 {
 	// Return a bounds that fills the world.
@@ -507,6 +597,7 @@ FBoxSphereBounds UBrickGridComponent::CalcBounds(const FTransform & LocalToWorld
 
 FBrickGridParameters::FBrickGridParameters()
 : EmptyMaterialIndex(0)
+, firstComplexBrickIndex(250)
 , BricksPerRegionLog2(5,5,7)
 , RenderChunksPerRegionLog2(0,0,2)
 , CollisionChunksPerRegionLog2(1,1,2)
