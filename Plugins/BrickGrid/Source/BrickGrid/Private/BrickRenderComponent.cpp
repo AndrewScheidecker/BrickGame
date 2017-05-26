@@ -561,6 +561,22 @@ FPrimitiveSceneProxy* UBrickRenderComponent::CreateSceneProxy()
 	return BrickSceneProxy;
 }
 
+void UBrickRenderComponent::GetUsedMaterials(TArray<UMaterialInterface*>& OutMaterials,bool bGetDebugMaterials) const
+{
+	for (int32 MaterialIndex = 0; MaterialIndex < Grid->Parameters.Materials.Num(); ++MaterialIndex)
+	{
+		const auto& BrickMaterial = Grid->Parameters.Materials[MaterialIndex];
+		if(BrickMaterial.SurfaceMaterial)
+		{
+			OutMaterials.Add(BrickMaterial.SurfaceMaterial);
+		}
+		if(BrickMaterial.OverrideTopSurfaceMaterial)
+		{
+			OutMaterials.Add(BrickMaterial.OverrideTopSurfaceMaterial);
+		}
+	}
+}
+
 FBoxSphereBounds UBrickRenderComponent::CalcBounds(const FTransform & LocalToWorld) const
 {
 	FBoxSphereBounds NewBounds;

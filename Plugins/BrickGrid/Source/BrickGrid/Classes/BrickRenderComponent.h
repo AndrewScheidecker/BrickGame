@@ -26,6 +26,7 @@ public:
 
 	// Begin UPrimitiveComponent interface.
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
+	virtual void GetUsedMaterials(TArray<UMaterialInterface*>& OutMaterials,bool bGetDebugMaterials) const override;
 	// End UPrimitiveComponent interface.
 
 	// Begin USceneComponent interface.
