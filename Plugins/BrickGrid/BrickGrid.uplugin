@@ -6,7 +6,7 @@
 	"VersionName" : "1.0",
 	"CreatedBy" : "Andrew Scheidecker",
 	"CreatedByURL" : "http://www.scheidecker.net",
-	"MinEngineVersion" : 1579795,
+	"MinEngineVersion" : "4.17",
 	"Description" : "A component that renders a 3D grid of cubes.",
 	"CategoryPath" : "Rendering.Components",
 	

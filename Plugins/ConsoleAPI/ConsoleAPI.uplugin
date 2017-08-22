@@ -6,7 +6,7 @@
 	"VersionName" : "1.0",
 	"CreatedBy" : "Andrew Scheidecker",
 	"CreatedByURL" : "http://www.scheidecker.net/",
-	"EngineVersion" : 1579795,
+	"EngineVersion" : "4.17",
 	"Description" : "A plugin that allows Blueprint to register/deregister console commands.",
 	"Category" : "Blueprint",
 	

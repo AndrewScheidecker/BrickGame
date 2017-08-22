@@ -17,10 +17,12 @@ namespace UnrealBuildTool.Rules
 					"BrickGrid"
 				}
 				);
+			
 			PrivateDependencyModuleNames.AddRange(
 				new string[]
 				{
-					"SimplexNoise"
+					"SimplexNoise",
+					"BrickGrid"
 				}
 				);
 		}
