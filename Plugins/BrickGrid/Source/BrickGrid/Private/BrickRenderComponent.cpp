@@ -128,7 +128,7 @@ public:
 		FaceIndex = InFaceIndex;
 
 		// Initialize the vertex factory's stream components.
-		DataType NewData;
+		FDataType NewData;
 		NewData.PositionComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N);
 		NewData.TextureCoordinates.Add(STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_UByte4N));
 		NewData.ColorComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(&VertexBuffer, FBrickVertex, X, VET_Color);
@@ -139,7 +139,7 @@ public:
 		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
 			InitBrickChunkVertexFactory,
 			FBrickChunkVertexFactory*,VertexFactory,this,
-			DataType,NewData,NewData,
+			FDataType,NewData,NewData,
 		{
 			VertexFactory->SetData(NewData);
 		});
@@ -149,7 +149,7 @@ public:
 	{
 		return IsStaticBatchVisible(View.ViewMatrices.GetViewOrigin(),Batch) ? 1 : 0;
 	}
-	virtual uint64 GetStaticBatchElementShadowVisibility(const class FSceneView& View, const FLightSceneProxy* LightSceneProxy, const struct FMeshBatch* Batch) const override
+	virtual uint64 GetStaticBatchElementShadowVisibility(const class FSceneView& View, const FLightSceneProxy* LightSceneProxy, const struct FMeshBatch* Batch)
 	{
 		return IsStaticBatchVisible(LightSceneProxy->GetPosition(),Batch) ? 1 : 0;
 	}

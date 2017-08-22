@@ -146,7 +146,7 @@ struct FInt3
 };
 
 /** A region of the brick grid. */
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FBrickRegion
 {
 	GENERATED_USTRUCT_BODY()
